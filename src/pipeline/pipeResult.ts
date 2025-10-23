@@ -57,6 +57,7 @@ export type PipeSuccess<T> = Readonly<{
 export type PipeError<T> = Readonly<{
   error: Error
   origin: T | null
+  stage: string
   timestamp: number
 }>
 
@@ -66,10 +67,11 @@ export function makePipeSuccess<O>(ret: Input<O>) {
   }
 }
 
-export function makePipeError<O>(error: Error, origin: O | null) {
+export function makePipeError<O>(error: Error, origin: O | null, stage: string) {
   return {
     error,
     origin,
+    stage,
     timestamp: Date.now(),
   }
 }

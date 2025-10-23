@@ -7,8 +7,8 @@ import { HandlerResult, Input } from '../types'
 
 import { makePipeError, makePipeSuccess, PipeError, PipeSuccess } from './pipeResult'
 
-export function isError(obj: unknown): obj is Error {
-  return obj instanceof Error
+export function isError<T>(x: HandlerResult<T>): x is Error {
+  return x instanceof Error
 }
 
 export interface PipeInterface {
@@ -17,13 +17,13 @@ export interface PipeInterface {
 }
 
 type PipeFunction<I, R> = (input: Input<I>) => HandlerResult<R>
-type RecoverFunction<Recover> = (error: Error) => HandlerResult<Recover>
+type RecoverFunction<PI, R> = (error: Error, parentInput: PI | null) => HandlerResult<R>
 
-export class Pipe<I, O, PI, RootI, RootO> implements PipeInterface {
-  private start: Pipe<RootI, unknown, PI, RootI, RootO> | null = null
+export class Pipe<I, O, PI, RootI> implements PipeInterface {
+  private start: Pipe<RootI, unknown, never, RootI> | null = null
   private entryInput: Input<I> | null = null
 
-  private next: Pipe<O, unknown, I, RootI, RootO> | null = null
+  private next: Pipe<O, unknown, I, RootI> | null = null
 
   private success: PipeSuccess<O> | null = null
   private error: PipeError<I> | null = null
@@ -33,9 +33,10 @@ export class Pipe<I, O, PI, RootI, RootO> implements PipeInterface {
   }
 
   constructor(
-    private parent: Pipe<PI, I, never, RootI, RootO> | null,
+    private parent: Pipe<PI, I, never, RootI> | null,
     private step: (input: Input<I>) => HandlerResult<O>,
-    private recover: RecoverFunction<I> = Pipe.errorPassthrough<I>
+    private recover: RecoverFunction<PI, I> = Pipe.errorPassthrough<I>,
+    private stage: string = 'no name'
   ) {
     if (this.parent) {
       this.parent.next = this
@@ -43,36 +44,45 @@ export class Pipe<I, O, PI, RootI, RootO> implements PipeInterface {
     }
   }
 
-  static from<sI, sR>(fn: PipeFunction<sI, sR>): Pipe<sI, sR, never, sI, sR> {
-    const pipe = new Pipe<sI, sR, never, sI, sR>(null, fn)
+  static from<sI, sR>(fn: PipeFunction<sI, sR>): Pipe<sI, sR, never, sI> {
+    const pipe = new Pipe<sI, sR, never, sI>(null, fn)
     pipe.start = pipe
     return pipe
   }
 
-  joint<R>(fn: PipeFunction<O, R>, recover?: RecoverFunction<O>): Pipe<O, R, I, RootI, RootO> {
-    return new Pipe<O, R, I, RootI, RootO>(this, fn, recover)
+  label(stage: string) {
+    this.stage = stage
+    return this
   }
 
-  branch<R>(pipe: Pipe<O, R, I, O, R>, recover?: RecoverFunction<O>) {
+  joint<R>(fn: PipeFunction<O, R>, recover?: RecoverFunction<I, O>): Pipe<O, R, I, RootI> {
+    return new Pipe<O, R, I, RootI>(this, fn, recover)
+  }
+
+  branch<R>(pipe: Pipe<O, R, I, O>, recover?: RecoverFunction<I, O>) {
     return this.joint((input: Input<O>): HandlerResult<R> => pipe.stream(input), recover)
+  }
+
+  repair(recover: RecoverFunction<I, O>): Pipe<O, O, I, RootI> {
+    return this.joint(x => x, recover)
   }
 
   window(
     fn?: (arg: Input<O>) => void,
     errFn?: (error: Error) => void,
     useReference: boolean = false
-  ): Pipe<O, O, I, RootI, RootO> {
+  ): Pipe<O, O, I, RootI> {
     let errorStore: Error | null = null
     return this.joint(
       (x: Input<O>) => {
         if (errorStore !== null) {
           return errorStore
         }
-        fn ? fn(useReference ? x : structuredClone(x)) : console.log(x)
+        fn ? fn(useReference ? x : structuredClone(x)) : console.log(this.stage, x)
         return x as HandlerResult<O>
       },
       (error: Error) => {
-        errFn ? errFn(useReference ? error : structuredClone(error)) : console.error(error)
+        errFn ? errFn(useReference ? error : structuredClone(error)) : console.error(this.stage, error)
         errorStore = error
         return {} as HandlerResult<O>
       }
@@ -91,7 +101,7 @@ export class Pipe<I, O, PI, RootI, RootO> implements PipeInterface {
 
   private setResult(ret: HandlerResult<O>, input: I) {
     if (ret instanceof Error) {
-      this.error = makePipeError(ret, input)
+      this.error = makePipeError(ret, input, this.stage)
     } else {
       this.success = makePipeSuccess(ret)
     }
@@ -115,9 +125,9 @@ export class Pipe<I, O, PI, RootI, RootO> implements PipeInterface {
     const parentResult = this.parent.getResult()
 
     if (parentResult.error) {
-      const input = this.recover(parentResult.error.error)
+      const input = this.recover(parentResult.error.error, parentResult.error.origin)
       if (isError(input)) {
-        this.error = makePipeError(input, null)
+        this.error = makePipeError(input, null, this.stage)
         return null
       }
       const ret = this.step(input)
