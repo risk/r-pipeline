@@ -9,7 +9,8 @@ r-pipeline is built around the idea that data should flow as types do — safely
 - 🔒 **Type-Safe Pipeline**: **Complete type safety** from input to output with automatic type inference
 - 🚀 **Zero Runtime Errors**: Compile-time type checking prevents runtime errors
 - 🔗 **Chainable Steps**: Compose complex data transformations with **type-safe** chaining
-- ⚡ **IntelliSense Support**: Full TypeScript IntelliSense for better developer experience
+- ⚡ **Async Support**: **Seamless async/await** support with type-safe async pipelines
+- 🔄 **Sync + Async Mix**: Mix synchronous and asynchronous operations in the same pipeline
 - 🛡️ **Error Handling**: Type-safe error handling with automatic type propagation
 - 📦 **TypeScript First**: Built exclusively for TypeScript with **zero JavaScript dependencies**
 - 🧪 **Well Tested**: Comprehensive test coverage with 90%+ coverage
@@ -78,29 +79,76 @@ const result = pipeline.stream(5);  // ✅ Type-safe: result is number
 console.log(result); // 33
 ```
 
+### ⚡ Async Pipeline Support
+
+```typescript
+import { AsyncPipe } from 'r-pipeline';
+
+// ✅ Type-safe async pipeline with automatic type inference
+const asyncPipeline = AsyncPipe.from(async (x: number) => x * 2)
+  .joint(async x => x + 1)      // ✅ Type inferred: number
+  .joint(x => `result: ${x}`);  // ✅ Type inferred: string
+
+const result = await asyncPipeline.stream(5);  // ✅ Type-safe: result is string
+console.log(result); // "result: 11"
+```
+
+### 🔄 Sync + Async Mix
+
+```typescript
+// ✅ Seamless mixing of sync and async operations
+const mixedPipeline = AsyncPipe
+  .from((x: number) => x + 1)      // ✅ Sync operation
+  .joint(async x => x * 2)          // ✅ Async operation
+  .joint(x => `v:${x}`);            // ✅ Sync operation
+
+const result = await mixedPipeline.stream(5);  // ✅ Type-safe: result is string
+console.log(result); // "v:12"
+```
+
 ## 🔒 Type-Safe API Reference
 
-### `Pipe.from<I, O>(fn: (input: I) => O | Error)`
+### **Sync Pipeline**
 
-Creates a new **type-safe** pipeline with the given initial step.
+#### `Pipe.from<I, O>(fn: (input: I) => O | Error)`
+
+Creates a new **type-safe** synchronous pipeline with the given initial step.
 - **I**: Input type (automatically inferred)
 - **O**: Output type (automatically inferred)
 
-### `pipe.joint<O, R>(fn: (input: O) => R | Error, recover?: (error: Error, parentInput: I | null) => R | Error)`
+#### `pipe.joint<O, R>(fn: (input: O) => R | Error, recover?: (error: Error, parentInput: I | null) => R | Error)`
 
-Adds a new **type-safe** step to the pipeline with optional error recovery.
+Adds a new **type-safe** step to the synchronous pipeline with optional error recovery.
 - **O**: Previous step output type (automatically inferred)
 - **R**: New step output type (automatically inferred)
 
-### `pipe.repair(recover: (error: Error, parentInput: I | null) => O | Error)`
+### **Async Pipeline**
+
+#### `AsyncPipe.from<I, O>(fn: (input: I) => O | Error | Promise<O | Error>)`
+
+Creates a new **type-safe** asynchronous pipeline with the given initial step.
+- **I**: Input type (automatically inferred)
+- **O**: Output type (automatically inferred)
+- **Supports**: Both sync and async functions
+
+#### `asyncPipe.joint<O, R>(fn: (input: O) => R | Error | Promise<R | Error>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+
+Adds a new **type-safe** step to the async pipeline with optional error recovery.
+- **O**: Previous step output type (automatically inferred)
+- **R**: New step output type (automatically inferred)
+- **Supports**: Both sync and async functions
+
+### **Common Methods**
+
+#### `pipe.repair(recover: (error: Error, parentInput: I | null) => O | Error | Promise<O | Error>)`
 
 Adds **type-safe** error recovery to the pipeline.
 
-### `pipe.window(fn?: (input: O) => void, errFn?: (error: Error) => void, useReference?: boolean)`
+#### `pipe.window(fn?: (input: O) => void | Promise<void>, errFn?: (error: Error) => void | Promise<void>, useReference?: boolean)`
 
 Adds **type-safe** debugging/logging to the pipeline.
 
-### `pipe.stream(input: I): O | Error`
+#### `pipe.stream(input: I): O | Error | Promise<O | Error>`
 
 Executes the pipeline with **type-safe** input and returns **type-safe** output.
 
@@ -111,6 +159,8 @@ Executes the pipeline with **type-safe** input and returns **type-safe** output.
 - **🛡️ Error Prevention**: Type-safe error handling prevents runtime crashes
 - **📈 Developer Experience**: Better refactoring and maintenance
 - **🎯 Zero Runtime Errors**: TypeScript compiler ensures correctness
+- **🔄 Async/Sync Harmony**: Seamlessly mix synchronous and asynchronous operations
+- **⚡ Performance**: Optimized for both sync and async workflows
 
 ## Development
 
