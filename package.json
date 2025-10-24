@@ -12,13 +12,12 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:ui": "vitest --ui",
+    "test": "vitest --coverage",
+    "test:watch": "vitest --coverage --watch",
+    "test:ui": "vitest --coverage --ui",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "format": "prettier --write src/**/*.ts",
-    "prepare": "npm run build"
+    "format": "prettier --write src/**/*.ts"
   },
   "keywords": [
     "typescript",

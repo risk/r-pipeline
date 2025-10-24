@@ -5,4 +5,5 @@
 
 import { Pipe } from '../pipeline/pipe'
 
-const pipe = Pipe.from((x: number) => 1)
+const pipe = Pipe.from((x: number) => x)
+console.log(pipe.stream(1))
