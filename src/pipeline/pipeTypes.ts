@@ -3,7 +3,8 @@
  * https://github.com/risk/r-pipeline
  */
 
-import { Input } from '../types'
+export type Input<T> = Exclude<T, undefined | null>
+export type HandlerResult<R> = Input<R> | Error
 
 export type PipeSuccess<T> = Readonly<{
   value: Input<T>
