@@ -16,7 +16,7 @@ module.exports = {
       },
     },
   ],
-  plugins: ['@typescript-eslint', 'prettier', 'header', 'import'],
+  plugins: ['@typescript-eslint', 'prettier', 'header', 'import', 'vitest'],
   extends: ['eslint:recommended', 'prettier'],
   rules: {
     'prettier/prettier': 'error',
@@ -52,5 +52,16 @@ module.exports = {
     node: true,
     es6: true,
     jest: true,
+  },
+  globals: {
+    vi: 'readonly',
+    describe: 'readonly',
+    it: 'readonly',
+    test: 'readonly',
+    expect: 'readonly',
+    beforeEach: 'readonly',
+    afterEach: 'readonly',
+    beforeAll: 'readonly',
+    afterAll: 'readonly',
   },
 }

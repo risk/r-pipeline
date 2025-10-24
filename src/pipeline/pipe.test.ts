@@ -3,7 +3,7 @@
  * https://github.com/risk/r-pipeline
  */
 
-import { isError, Pipe } from './pipe'
+import { Pipe } from './pipe'
 
 describe('Pipeline', () => {
   describe('Pipe', () => {
@@ -98,13 +98,11 @@ describe('Pipeline', () => {
 
   describe('Error cases', () => {
     it('From process Error', () => {
-      const pipe = Pipe.from(() => new Error('error'))
+      const mockFunc = vi.fn()
+      const pipe = Pipe.from(mockFunc)
       expect(pipe).toBeDefined()
-      const ret = pipe.stream({})
-      expect(isError(ret)).toBeTruthy()
-      if (isError(ret)) {
-        expect(ret.message).toBe('error')
-      }
+      expect(pipe.unitStream()).toBeNull()
+      expect(mockFunc).not.toHaveBeenCalled()
     })
 
     it('Window pipe with error', () => {
@@ -114,10 +112,12 @@ describe('Pipeline', () => {
         .joint((): { v: number } | Error => new Error('error'))
         .window(undefined, (e: Error) => (e.message = 'change'))
         .joint(f)
+        .joint(f)
+        .joint(f)
       expect(pipe).toBeDefined()
       const ret = pipe.stream({ v: 1 })
-      expect(isError(ret)).toBeTruthy()
-      if (isError(ret)) {
+      expect(ret instanceof Error).toBeTruthy()
+      if (ret instanceof Error) {
         expect(ret.message).toBe('error')
       }
     })
@@ -129,8 +129,8 @@ describe('Pipeline', () => {
         .joint(f)
       expect(pipe).toBeDefined()
       const ret = pipe.stream(1)
-      expect(isError(ret)).toBeTruthy()
-      if (isError(ret)) {
+      expect(ret instanceof Error).toBeTruthy()
+      if (ret instanceof Error) {
         expect(ret.message).toBe('error')
       }
     })

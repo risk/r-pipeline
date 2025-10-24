@@ -3,11 +3,10 @@
  * https://github.com/risk/r-pipeline
  */
 
-import { HandlerResult, Input } from '../types'
 
-import { makePipeError, makePipeSuccess, PipeError, PipeSuccess } from './pipeResult'
+import { HandlerResult, Input, makePipeError, makePipeSuccess, PipeError, PipeSuccess } from './pipeTypes'
 
-export function isError<T>(x: HandlerResult<T>): x is Error {
+function isError<T>(x: HandlerResult<T>): x is Error {
   return x instanceof Error
 }
 
@@ -59,7 +58,7 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface {
     return new Pipe<O, R, I, RootI>(this, fn, recover)
   }
 
-  branch<R>(pipe: Pipe<O, R, I, O>, recover?: RecoverFunction<I, O>) {
+  branch<R>(pipe: Pipe<O, R, never, O>, recover?: RecoverFunction<I, O>) {
     return this.joint((input: Input<O>): HandlerResult<R> => pipe.stream(input), recover)
   }
 
@@ -97,6 +96,18 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface {
       success: this.success,
       error: this.error,
     }
+  }
+
+  getStreamError(): Error | null {
+    const ret = this.getResult()
+    if(ret.success === null && ret.error !== null) {
+      return ret.error.error
+    }
+    if(this.parent === null) {
+      return null
+    }
+    return this.parent.getStreamError()
+
   }
 
   private setResult(ret: HandlerResult<O>, input: I) {
@@ -158,11 +169,12 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface {
 
     this.start.doStream(input)
     const result = this.getResult()
-    if (result.error) {
-      return result.error.error
-    }
     if (result.success) {
       return result.success.value
+    }
+    const streamError = this.getStreamError()
+    if (streamError) {
+      return streamError
     }
     return new Error('Result not found')
   }
