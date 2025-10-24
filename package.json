@@ -25,7 +25,7 @@
     "data-processing",
     "utility"
   ],
-  "author": "りすく",
+  "author": "riskrisk",
   "license": "MIT",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
