@@ -1,8 +1,8 @@
 {
   "name": "r-pipeline",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
-  "description": "A TypeScript utility library for data processing pipelines",
+  "description": "A TypeScript utility library for data processing pipelines with async support",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -22,8 +22,10 @@
   "keywords": [
     "typescript",
     "pipeline",
+    "async",
     "data-processing",
-    "utility"
+    "utility",
+    "type-safe"
   ],
   "author": "riskrisk",
   "license": "MIT",

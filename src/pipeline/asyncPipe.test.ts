@@ -329,7 +329,7 @@ describe('Async Pipeline', () => {
       const p = AsyncPipe
         .from((x: number) => x)
         .joint<number>(() => new Error('boom'))
-        .repair((err, parent) => (parent ?? 0) + 10)
+        .repair((_err, parent) => (parent ?? 0) + 10)
         .joint(x => x + 1)
   
       const out = await p.stream(1)
