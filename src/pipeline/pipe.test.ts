@@ -13,6 +13,11 @@ describe('Pipeline', () => {
       expect(pipe.stream(true)).toBe(false)
     })
 
+    it('From only', () => {
+      const pipe = Pipe.from((x: boolean) => !x)
+      expect(pipe.stream(true)).toBe(false)
+    })
+
     it('Joint a pipe', () => {
       const pipe = Pipe.from((x: string) => `${x}-`).joint((x: string) => `${x}-`)
       expect(pipe).toBeDefined()
@@ -36,6 +41,13 @@ describe('Pipeline', () => {
     })
 
     it('Window pipe', () => {
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f).joint(f).window().joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream(1)).toBe(4)
+    })
+
+    it('Window pipe with func', () => {
       let actual: number | null = null
       const f = (x: number) => x + 1
       const pipe = Pipe.from(f)
@@ -66,6 +78,35 @@ describe('Pipeline', () => {
       expect(actual).toBe(3)
     })
 
+    it('Errror interruption repair', () => {
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint((): number | Error => new Error('error'))
+        .repair((error, parentInput) => {
+          if (parentInput === null) {
+            return error
+          }
+          console.log('repair from', parentInput)
+          return parentInput
+        })
+        .joint(f)
+      expect(pipe).toBeDefined()
+      const ret = pipe.stream(1)
+      expect(ret).toBe(3)
+    })
+  })
+
+  describe('Error cases', () => {
+    it('From process Error', () => {
+      const pipe = Pipe.from(() => new Error('error'))
+      expect(pipe).toBeDefined()
+      const ret = pipe.stream({})
+      expect(isError(ret)).toBeTruthy()
+      if (isError(ret)) {
+        expect(ret.message).toBe('error')
+      }
+    })
+
     it('Window pipe with error', () => {
       const f = (x: { v: number }) => ({ v: x.v + 1 })
       const pipe = Pipe.from(f)
@@ -94,49 +135,39 @@ describe('Pipeline', () => {
       }
     })
 
-    it('Errror interruption repair', () => {
-      const f = (x: number) => x + 1
-      const pipe = Pipe.from(f)
-        .joint((): number | Error => new Error('error'))
-        .repair((error, parentInput) => {
-          if (parentInput === null) {
-            return error
-          }
-          console.log('repair from', parentInput)
-          return parentInput
-        })
-        .joint(f)
-      expect(pipe).toBeDefined()
-      const ret = pipe.stream(1)
-      expect(ret).toBe(3)
+    it('should handle recover function error', () => {
+      const pipe = Pipe.from((x: number) => x)
+        .joint(() => new Error('test'))
+        .repair(() => new Error('recover failed'))
+      expect(pipe.stream(1)).toBeInstanceOf(Error)
     })
   })
 
-  // describe('use pipeline', () => {
-  //   it('Multi step', () => {
-  //     const ret = Pipe.from((x: string) => x + 'start')
-  //       .joint(x => x + ' 1st')
-  //       .joint(x => x + ' 2nd')
-  //       .joint((): PipeResult<string> => {
-  //         return makePipeError('error')
-  //       })
-  //       .window(undefined, x => console.log('window error', x))
-  //       .joint(
-  //         x => ({ str: x + ' 3rd', num: 1 }),
-  //         () => 'recover error'
-  //       )
-  //       .joint(x => ({ str: x.str + ' 4th', num: x.num + 2 }))
-  //       .branch(
-  //         Pipe.from((x: { str: string; num: number }) => ({ str: x.str + ' 4th(Inject1)', num: x.num + 2 }))
-  //           .joint(x => ({ str: x.str + ' 4th(Inject2)', num: x.num + 2 }))
-  //           .joint(x => ({ str: x.str + ' 4th(Inject3)', num: x.num + 2, b: true }))
-  //       )
-  //       .window(x => console.log('window', x))
-  //       .joint(x => ({ str: x.str + ' 5th', num: x.num + 2 }))
-  //       .stream('')
+  describe('use pipeline', () => {
+    it('Multi step', () => {
+      const ret = Pipe.from((x: string) => x + 'start')
+        .joint(x => x + ' 1st')
+        .joint(x => x + ' 2nd')
+        .joint((): string | Error => {
+          return new Error('error')
+        })
+        .window(undefined, x => console.log('window error', x))
+        .joint(
+          x => ({ str: x + ' 3rd', num: 1 }),
+          () => 'recover error'
+        )
+        .joint(x => ({ str: x.str + ' 4th', num: x.num + 2 }))
+        .branch(
+          Pipe.from((x: { str: string; num: number }) => ({ str: x.str + ' 4th(Inject1)', num: x.num + 2 }))
+            .joint(x => ({ str: x.str + ' 4th(Inject2)', num: x.num + 2 }))
+            .joint(x => ({ str: x.str + ' 4th(Inject3)', num: x.num + 2, b: true }))
+        )
+        .window(x => console.log('window', x))
+        .joint(x => ({ str: x.str + ' 5th', num: x.num + 2 }))
+        .stream('')
 
-  //     console.log('execute result', ret)
-  //     return true
-  //   })
-  // })
+      console.log('execute result', ret)
+      return true
+    })
+  })
 })

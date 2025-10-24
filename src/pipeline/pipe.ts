@@ -11,7 +11,7 @@ export function isError<T>(x: HandlerResult<T>): x is Error {
   return x instanceof Error
 }
 
-export interface PipeInterface {
+interface PipeInterface {
   unitStream(): PipeInterface | null
   getResult(): unknown
 }

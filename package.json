@@ -45,7 +45,8 @@
     "typescript": "^5.1.0",
     "tslib": "^2.6.0",
     "vitest": "^1.0.0",
-    "@vitest/ui": "^1.0.0"
+    "@vitest/ui": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0"
   },
   "peerDependencies": {},
   "repository": {
