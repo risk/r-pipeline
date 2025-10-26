@@ -1,16 +1,16 @@
 # r-pipeline
 
-A **Type-Safe** TypeScript utility library for creating and managing data processing pipelines.
+A **Type-Safe** TypeScript utility library for creating and managing data processing pipelines with unified sync/async support.
 
-r-pipeline is built around the idea that data should flow as types do — safely, predictably, and with responsibility.
+r-pipeline is built around the idea that data should flow as types do — safely, predictably, and with responsibility. Now with **unified sync/async pipeline support** in a single, powerful API.
 
 ## 🎯 Key Features
 
 - 🔒 **Type-Safe Pipeline**: **Complete type safety** from input to output with automatic type inference
 - 🚀 **Zero Runtime Errors**: Compile-time type checking prevents runtime errors
 - 🔗 **Chainable Steps**: Compose complex data transformations with **type-safe** chaining
-- ⚡ **Async Support**: **Seamless async/await** support with type-safe async pipelines
-- 🔄 **Sync + Async Mix**: Mix synchronous and asynchronous operations in the same pipeline
+- ⚡ **Unified Async Support**: **Single API** for both sync and async operations with `stream()` and `streamAsync()`
+- 🔄 **Sync + Async Mix**: Seamlessly mix synchronous and asynchronous operations in the same pipeline
 - 🛡️ **Error Handling**: Type-safe error handling with automatic type propagation
 - 📦 **TypeScript First**: Built exclusively for TypeScript with **zero JavaScript dependencies**
 - 🧪 **Well Tested**: Comprehensive test coverage with 90%+ coverage
@@ -82,85 +82,129 @@ console.log(result); // 33
 ### ⚡ Async Pipeline Support
 
 ```typescript
-import { AsyncPipe } from 'r-pipeline';
+import { Pipe } from 'r-pipeline';
 
 // ✅ Type-safe async pipeline with automatic type inference
-const asyncPipeline = AsyncPipe.from(async (x: number) => x * 2)
+const asyncPipeline = Pipe.from(async (x: number) => x * 2)
   .joint(async x => x + 1)      // ✅ Type inferred: number
   .joint(x => `result: ${x}`);  // ✅ Type inferred: string
 
-const result = await asyncPipeline.stream(5);  // ✅ Type-safe: result is string
+const result = await asyncPipeline.streamAsync(5);  // ✅ Type-safe: result is string
 console.log(result); // "result: 11"
 ```
 
 ### 🔄 Sync + Async Mix
 
 ```typescript
-// ✅ Seamless mixing of sync and async operations
-const mixedPipeline = AsyncPipe
+// ✅ Seamless mixing of sync and async operations in unified API
+const mixedPipeline = Pipe
   .from((x: number) => x + 1)      // ✅ Sync operation
   .joint(async x => x * 2)          // ✅ Async operation
   .joint(x => `v:${x}`);            // ✅ Sync operation
 
-const result = await mixedPipeline.stream(5);  // ✅ Type-safe: result is string
+const result = await mixedPipeline.streamAsync(5);  // ✅ Type-safe: result is string
 console.log(result); // "v:12"
+```
+
+### 🛡️ Type-Safe Error Handling with Async
+
+```typescript
+// ✅ Type-safe error handling with async recovery
+const asyncPipeline = Pipe.from(async (x: number) => x * 2)
+  .joint(async (): Promise<number | Error> => new Error('async error'))
+  .repair(async (error, parentInput) => {  // ✅ Async recovery
+    console.log('async repair from', parentInput);
+    return (parentInput || 0) + 10;
+  })
+  .joint(async x => x + 1);
+
+const result = await asyncPipeline.streamAsync(5);
+console.log(result); // 21
+```
+
+### 🔍 Type-Safe Debugging with Async
+
+```typescript
+// ✅ Type-safe debugging with async support
+const asyncPipeline = Pipe.from(async (x: number) => x * 2)
+  .joint(async x => x + 1)
+  .windowAsync(async x => {  // ✅ Async debugging
+    console.log('async debug:', x);
+    await someAsyncOperation(x);
+  })
+  .joint(async x => x * 3);
+
+const result = await asyncPipeline.streamAsync(5);
+// Output: async debug: 11
+console.log(result); // 33
 ```
 
 ## 🔒 Type-Safe API Reference
 
-### **Sync Pipeline**
+### **Unified Pipeline API**
 
-#### `Pipe.from<I, O>(fn: (input: I) => O | Error)`
+#### `Pipe.from<I, O>(fn: (input: I) => O | Error | Promise<O | Error>)`
 
-Creates a new **type-safe** synchronous pipeline with the given initial step.
-- **I**: Input type (automatically inferred)
-- **O**: Output type (automatically inferred)
-
-#### `pipe.joint<O, R>(fn: (input: O) => R | Error, recover?: (error: Error, parentInput: I | null) => R | Error)`
-
-Adds a new **type-safe** step to the synchronous pipeline with optional error recovery.
-- **O**: Previous step output type (automatically inferred)
-- **R**: New step output type (automatically inferred)
-
-### **Async Pipeline**
-
-#### `AsyncPipe.from<I, O>(fn: (input: I) => O | Error | Promise<O | Error>)`
-
-Creates a new **type-safe** asynchronous pipeline with the given initial step.
+Creates a new **type-safe** pipeline with the given initial step.
 - **I**: Input type (automatically inferred)
 - **O**: Output type (automatically inferred)
 - **Supports**: Both sync and async functions
 
-#### `asyncPipe.joint<O, R>(fn: (input: O) => R | Error | Promise<R | Error>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+#### `pipe.joint<O, R>(fn: (input: O) => R | Error | Promise<R | Error>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
-Adds a new **type-safe** step to the async pipeline with optional error recovery.
+Adds a new **type-safe** step to the pipeline with optional error recovery.
 - **O**: Previous step output type (automatically inferred)
 - **R**: New step output type (automatically inferred)
 - **Supports**: Both sync and async functions
 
-### **Common Methods**
+#### `pipe.branch<R>(pipe: Pipe<O, R, never, O>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+
+Adds a **type-safe** branch pipeline for synchronous operations.
+
+#### `pipe.branchAsync<R>(pipe: Pipe<O, R, never, O>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+
+Adds a **type-safe** branch pipeline for asynchronous operations.
+
+### **Execution Methods**
+
+#### `pipe.stream(input: I): O | Error`
+
+Executes the pipeline synchronously with **type-safe** input and returns **type-safe** output.
+- **Note**: Will return an error if any step in the pipeline is asynchronous
+
+#### `pipe.streamAsync(input: I): Promise<O | Error>`
+
+Executes the pipeline asynchronously with **type-safe** input and returns **type-safe** output.
+- **Supports**: Both sync and async operations in the same pipeline
+
+### **Utility Methods**
 
 #### `pipe.repair(recover: (error: Error, parentInput: I | null) => O | Error | Promise<O | Error>)`
 
 Adds **type-safe** error recovery to the pipeline.
 
-#### `pipe.window(fn?: (input: O) => void | Promise<void>, errFn?: (error: Error) => void | Promise<void>, useReference?: boolean)`
+#### `pipe.window(fn?: (input: O) => void, errFn?: (error: Error) => void, useReference?: boolean)`
 
-Adds **type-safe** debugging/logging to the pipeline.
+Adds **type-safe** synchronous debugging/logging to the pipeline.
 
-#### `pipe.stream(input: I): O | Error | Promise<O | Error>`
+#### `pipe.windowAsync(fn?: (input: O) => void | Promise<void>, errFn?: (error: Error) => void | Promise<void>, useReference?: boolean)`
 
-Executes the pipeline with **type-safe** input and returns **type-safe** output.
+Adds **type-safe** asynchronous debugging/logging to the pipeline.
 
-## 🚀 Why Type-Safe Pipelines?
+#### `pipe.label(stage: string)`
+
+Adds a label to the current pipeline step for better error reporting and debugging.
+
+## 🚀 Why Unified Type-Safe Pipelines?
 
 - **🔒 Compile-time Safety**: Catch errors before runtime
 - **⚡ IntelliSense Support**: Full autocomplete and type hints
 - **🛡️ Error Prevention**: Type-safe error handling prevents runtime crashes
 - **📈 Developer Experience**: Better refactoring and maintenance
 - **🎯 Zero Runtime Errors**: TypeScript compiler ensures correctness
-- **🔄 Async/Sync Harmony**: Seamlessly mix synchronous and asynchronous operations
+- **🔄 Unified API**: Single API for both sync and async operations
 - **⚡ Performance**: Optimized for both sync and async workflows
+- **🎨 Clean Code**: No need to choose between different pipeline types
 
 ## Development
 

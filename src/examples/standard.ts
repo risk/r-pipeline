@@ -24,50 +24,44 @@ const typeChain = Pipe.from((x: number) => 'str:' + x.toString()).joint(x => x +
 console.log(typeChain.stream(1))
 // output -> str:11
 
-const typeChainObject = Pipe
-    .from((x: number) => ({ value: x}))
-    .joint(x => ({
-      prev: x.value,
-      value: x.value + 1
-    }))
+const typeChainObject = Pipe.from((x: number) => ({ value: x })).joint(x => ({
+  prev: x.value,
+  value: x.value + 1,
+}))
 console.log(typeChainObject.stream(1))
 // output -> { prev: 1, value: 2}
 
 // Pipes with window : Debug print
-const pipesWithWindow = Pipe.from((x: number) => x).joint(x => x + 1).window()
+const pipesWithWindow = Pipe.from((x: number) => x)
+  .joint(x => x + 1)
+  .window()
 console.log(pipesWithWindow.stream(1))
 // output -> no name 2 -> 2
 
-// Pipes stream error : Immediately　return
-const pipesWithError = Pipe
-    .from((x: number) => x)
-    .joint(():number | Error => new Error('error'))
-    .joint((x) => x + 1 )
-    .joint((x) => x + 1 )
+// Pipes stream error : Immediately return
+const pipesWithError = Pipe.from((x: number) => x)
+  .joint((): number | Error => new Error('error'))
+  .joint(x => x + 1)
+  .joint(x => x + 1)
 const ret = pipesWithError.stream(1)
 console.log(ret instanceof Error ? ret.message : 'not Error')
 // output -> error
 
 // Branch pipe connect
-const subPipeX2 = Pipe
-  .from((x: number) => x)
-  .joint(x => ({
-    x2: x * 2,
-    x4: x * 4,
-    x8: x * 8,
-  }))
-const subPipeX3 = Pipe
-  .from((x: number) => x)
-  .joint(x => ({
-    x3: x * 3,
-    x6: x * 6,
-    x9: x * 9,
-  }))
-const basePipe = Pipe
-  .from((x: number) => x)
+const subPipeX2 = Pipe.from((x: number) => x).joint(x => ({
+  x2: x * 2,
+  x4: x * 4,
+  x8: x * 8,
+}))
+const subPipeX3 = Pipe.from((x: number) => x).joint(x => ({
+  x3: x * 3,
+  x6: x * 6,
+  x9: x * 9,
+}))
+const basePipe = Pipe.from((x: number) => x)
 
 const x2Pipe = basePipe.branch(subPipeX2)
-  console.log(x2Pipe.stream(2))
+console.log(x2Pipe.stream(2))
 // output -> { x2: 4, x4: 8, x8: 16 }
 
 const x3Pipe = basePipe.branch(subPipeX3)
