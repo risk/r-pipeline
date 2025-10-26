@@ -5,7 +5,7 @@
 
 import { Pipe } from './pipe'
 
-describe('Async Pipeline', () => {
+describe('Pipeline', () => {
   describe('Pipe', () => {
     it('Create pipe entry', () => {
       const pipe = Pipe.from((x: boolean) => !x)
@@ -78,6 +78,42 @@ describe('Async Pipeline', () => {
       expect(actual).toBe(3)
     })
 
+    it('Window pipe with object and use reference', () => {
+      let actual: number | null = null
+      const f = (x: { v: number }) => ({ v: x.v + 1 })
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .window(
+          x => {
+            actual = x.v
+            x.v = 1000
+            return 100
+          },
+          undefined,
+          true
+        )
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream({ v: 1 })).toStrictEqual({ v: 1001 })
+      expect(actual).toBe(3)
+    })
+
+    it('Labeling pipe', () => {
+      let targetStage: string | null = null
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .label('test')
+        .window((_x, stage) => {
+          targetStage = stage
+          return 100
+        })
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream(1)).toBe(4)
+      expect(targetStage).toBe('test')
+    })
+
     it('Errror interruption repair', () => {
       const f = (x: number) => x + 1
       const pipe = Pipe.from(f)
@@ -135,6 +171,31 @@ describe('Async Pipeline', () => {
         .repair(() => new Error('recover failed'))
       expect(pipe.stream(1)).toBeInstanceOf(Error)
     })
+
+    it('Window with thenable handler', () => {
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .window(async () => {})
+        .joint(f)
+      expect(pipe.stream(1)).toBe(3)
+      // warn message: Window handler is thenable function
+    })
+
+    it('Window with thenable error handler', () => {
+      const pipe = Pipe.from(() => new Error('error')).window(undefined, async () => {})
+      expect(pipe.stream(1)).toBeInstanceOf(Error)
+      // warn message: Window handler is thenable function
+    })
+
+    it('Recover thenable error', () => {
+      const pipe = Pipe.from(() => new Error('error')).joint(
+        x => x,
+        async error => error
+      )
+      const result = pipe.stream(1)
+      expect(result).toBeInstanceOf(Error)
+      expect(result.message).toBe('Cannot use thenable function. Please use streamAsync')
+    })
   })
 
   describe('use pipeline', () => {
@@ -167,7 +228,7 @@ describe('Async Pipeline', () => {
     })
   })
 
-  describe('Pipe', () => {
+  describe('Async Pipe', () => {
     it('Create pipe entry', async () => {
       const pipe = Pipe.from(async (x: boolean) => ({ b: !x }))
       expect(pipe).toBeDefined()
@@ -235,6 +296,41 @@ describe('Async Pipeline', () => {
       expect(pipe).toBeDefined()
       expect(await pipe.streamAsync({ v: 1 })).toStrictEqual({ v: 4 })
       expect(actual).toBe(3)
+    })
+
+    it('Window pipe with object and use reference', async () => {
+      let actual: number | null = null
+      const f = async (x: { v: number }) => ({ v: x.v + 1 })
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .windowAsync(
+          async x => {
+            actual = x.v
+            x.v = 1000
+          },
+          undefined,
+          true
+        )
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync({ v: 1 })).toStrictEqual({ v: 1001 })
+      expect(actual).toBe(3)
+    })
+
+    it('Labeling pipe', async () => {
+      let targetStage: string | null = null
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .label('test')
+        .window((_x, stage) => {
+          targetStage = stage
+          return 100
+        })
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync(1)).toBe(4)
+      expect(targetStage).toBe('test')
     })
 
     it('Errror interruption repair', async () => {

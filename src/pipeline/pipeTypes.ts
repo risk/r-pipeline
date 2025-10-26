@@ -17,6 +17,11 @@ export type PipeError<T> = Readonly<{
   timestamp: number
 }>
 
+export type PipeResult<S, E> = {
+  success: PipeSuccess<S> | null
+  error: PipeError<E> | null
+}
+
 export function makePipeSuccess<O>(ret: Input<O>) {
   return {
     value: ret,
