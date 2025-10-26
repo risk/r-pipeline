@@ -39,7 +39,6 @@
 
 - `.github/workflows/ci.yml` - プルリクエスト用のCI
 - `.github/workflows/release.yml` - リリース用のワークフロー
-- `.github/CODEOWNERS` - コードオーナー設定
 
 ### 注意事項
 
