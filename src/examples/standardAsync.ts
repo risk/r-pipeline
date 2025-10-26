@@ -83,7 +83,7 @@ async function main() {
     .joint(async x => x + 1)
     .joint(x => x + 1)
   console.log(await mixPpipesError.stream(1))
-  // output -> 4
+  // output -> Error: Cannot use thenable function
 
   // Branch pipe connect (mix)
   const subSyncPipeX2 = Pipe.from((x: number) => x).joint(x => ({
