@@ -3,6 +3,8 @@
  * https://github.com/risk/r-pipeline
  */
 
+import { MockInstance } from 'vitest'
+
 import { Pipe } from './pipe'
 
 describe('Pipeline', () => {
@@ -114,7 +116,7 @@ describe('Pipeline', () => {
       expect(targetStage).toBe('test')
     })
 
-    it('Errror interruption repair', () => {
+    it('Error interruption repair', () => {
       const f = (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint((): number | Error => new Error('error'))
@@ -152,7 +154,7 @@ describe('Pipeline', () => {
       }
     })
 
-    it('Errror interruption', () => {
+    it('Error interruption', () => {
       const f = (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint((): number | Error => new Error('error'))
@@ -181,10 +183,25 @@ describe('Pipeline', () => {
       // warn message: Window handler is thenable function
     })
 
-    it('Window with thenable error handler', () => {
-      const pipe = Pipe.from(() => new Error('error')).window(undefined, async () => {})
-      expect(pipe.stream(1)).toBeInstanceOf(Error)
-      // warn message: Window handler is thenable function
+    describe('Pipe window thenable warning', () => {
+      let warnSpy: MockInstance<unknown[], void>
+
+      beforeEach(() => {
+        warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      })
+
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
+      it('should warn when window handler returns thenable', () => {
+        const pipe = Pipe.from((x: number) => x + 1).window(() => Promise.resolve('thenable result')) // 意図的にthenableを返す
+
+        pipe.stream(5)
+
+        // 警告が出力されたかチェック
+        expect(warnSpy).toHaveBeenCalledWith('Window handler is thenable function')
+      })
     })
 
     it('Recover thenable error', () => {
@@ -194,7 +211,7 @@ describe('Pipeline', () => {
       )
       const result = pipe.stream(1)
       expect(result).toBeInstanceOf(Error)
-      expect(result.message).toBe('Cannot use thenable function. Please use streamAsync')
+      expect(result.message).toBe('Cannot use thenable function. Please use streamAsync()')
     })
   })
 
@@ -333,7 +350,7 @@ describe('Pipeline', () => {
       expect(targetStage).toBe('test')
     })
 
-    it('Errror interruption repair', async () => {
+    it('Error interruption repair', async () => {
       const f = async (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint(async (): Promise<number | Error> => new Error('error'))
@@ -371,7 +388,7 @@ describe('Pipeline', () => {
       }
     })
 
-    it('Errror interruption', async () => {
+    it('Error interruption', async () => {
       const f = async (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint(async (): Promise<number | Error> => new Error('error'))
@@ -424,6 +441,18 @@ describe('Pipeline', () => {
 
       const out = await p.streamAsync(1)
       expect(out).toBe(12)
+    })
+
+    it('branch pipe', async () => {
+      const f = (x: string) => `${x}+`
+      const asyncf = async (x: string) => `${x}+`
+      const branchPipe = Pipe.from(f).joint(f)
+      const branchAsyncPipe = Pipe.from(asyncf).joint(asyncf)
+
+      const pipe = Pipe.from(f).branch(branchPipe).branchAsync(branchAsyncPipe)
+
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync('S')).toBe('S+++++')
     })
   })
 
