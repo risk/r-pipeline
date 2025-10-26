@@ -1,0 +1,21 @@
+# CODEOWNERS file for r-pipeline
+
+# Global owners
+* @riskrisk
+
+# Source code
+src/ @riskrisk
+
+# Configuration files
+package.json @riskrisk
+tsconfig.json @riskrisk
+rollup.config.js @riskrisk
+vitest.config.ts @riskrisk
+
+# GitHub Actions
+.github/ @riskrisk
+
+# Documentation
+README.md @riskrisk
+RELEASE.md @riskrisk
+LICENSE @riskrisk

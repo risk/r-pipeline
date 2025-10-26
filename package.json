@@ -17,7 +17,9 @@
     "test:ui": "vitest --coverage --ui",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "format": "prettier --write src/**/*.ts"
+    "format": "prettier --write src/**/*.ts",
+    "prepublishOnly": "npm run build && npm test",
+    "release": "npm version && git push --follow-tags"
   },
   "keywords": [
     "typescript",
