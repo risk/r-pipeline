@@ -11,9 +11,10 @@ r-pipeline is built around the idea that data should flow as types do — safely
 - 🔗 **Chainable Steps**: Compose complex data transformations with **type-safe** chaining
 - ⚡ **Unified Async Support**: **Single API** for both sync and async operations with `stream()` and `streamAsync()`
 - 🔄 **Sync + Async Mix**: Seamlessly mix synchronous and asynchronous operations in the same pipeline
-- 🛡️ **Error Handling**: Type-safe error handling with automatic type propagation
+- 🛡️ **Advanced Error Handling**: Type-safe error handling with detailed error information and recovery
+- 🔍 **Enhanced Debugging**: Built-in debugging with stage information and reference control
 - 📦 **TypeScript First**: Built exclusively for TypeScript with **zero JavaScript dependencies**
-- 🧪 **Well Tested**: Comprehensive test coverage with 90%+ coverage
+- 🧪 **Well Tested**: Comprehensive test coverage with modular architecture
 
 ## Installation
 
@@ -68,14 +69,14 @@ console.log(result); // 11
 ### 🔍 Type-Safe Debugging
 
 ```typescript
-// ✅ Type-safe debugging with full IntelliSense support
+// ✅ Type-safe debugging with stage information
 const pipeline = Pipe.from((x: number) => x * 2)
   .joint(x => x + 1)
-  .window(x => console.log('debug:', x))  // ✅ Type-safe: x is number
+  .window((x, stage) => console.log(`${stage}:`, x))  // ✅ Type-safe: x is number, stage is string
   .joint(x => x * 3);
 
 const result = pipeline.stream(5);  // ✅ Type-safe: result is number
-// Output: debug: 11
+// Output: no name: 11
 console.log(result); // 33
 ```
 
@@ -125,17 +126,17 @@ console.log(result); // 21
 ### 🔍 Type-Safe Debugging with Async
 
 ```typescript
-// ✅ Type-safe debugging with async support
+// ✅ Type-safe debugging with async support and stage information
 const asyncPipeline = Pipe.from(async (x: number) => x * 2)
   .joint(async x => x + 1)
-  .windowAsync(async x => {  // ✅ Async debugging
-    console.log('async debug:', x);
+  .windowAsync(async (x, stage) => {  // ✅ Async debugging with stage
+    console.log(`${stage} async debug:`, x);
     await someAsyncOperation(x);
   })
   .joint(async x => x * 3);
 
 const result = await asyncPipeline.streamAsync(5);
-// Output: async debug: 11
+// Output: no name async debug: 11
 console.log(result); // 33
 ```
 
@@ -143,25 +144,25 @@ console.log(result); // 33
 
 ### **Unified Pipeline API**
 
-#### `Pipe.from<I, O>(fn: (input: I) => O | Error | Promise<O | Error>)`
+#### `Pipe.from<I, O>(handler: (input: I) => O | Error | Promise<O | Error>)`
 
 Creates a new **type-safe** pipeline with the given initial step.
 - **I**: Input type (automatically inferred)
 - **O**: Output type (automatically inferred)
 - **Supports**: Both sync and async functions
 
-#### `pipe.joint<O, R>(fn: (input: O) => R | Error | Promise<R | Error>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+#### `pipe.joint<O, R>(handler: (input: O) => R | Error | Promise<R | Error>, recoverHandler?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
 Adds a new **type-safe** step to the pipeline with optional error recovery.
 - **O**: Previous step output type (automatically inferred)
 - **R**: New step output type (automatically inferred)
 - **Supports**: Both sync and async functions
 
-#### `pipe.branch<R>(pipe: Pipe<O, R, never, O>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+#### `pipe.branch<R>(pipe: Pipe<O, R, never, O>, recoverHandler?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
 Adds a **type-safe** branch pipeline for synchronous operations.
 
-#### `pipe.branchAsync<R>(pipe: Pipe<O, R, never, O>, recover?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
+#### `pipe.branchAsync<R>(pipe: Pipe<O, R, never, O>, recoverHandler?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
 Adds a **type-safe** branch pipeline for asynchronous operations.
 
@@ -179,17 +180,23 @@ Executes the pipeline asynchronously with **type-safe** input and returns **type
 
 ### **Utility Methods**
 
-#### `pipe.repair(recover: (error: Error, parentInput: I | null) => O | Error | Promise<O | Error>)`
+#### `pipe.repair(recoverHandler: (error: Error, parentInput: I | null) => O | Error | Promise<O | Error>)`
 
 Adds **type-safe** error recovery to the pipeline.
 
-#### `pipe.window(fn?: (input: O) => void, errFn?: (error: Error) => void, useReference?: boolean)`
+#### `pipe.window(normalPath?: (input: O, stage: string) => void, errorPath?: (error: Error, stage: string) => void, useReference?: boolean)`
 
-Adds **type-safe** synchronous debugging/logging to the pipeline.
+Adds **type-safe** synchronous debugging/logging to the pipeline with stage information.
+- **input**: The current pipeline value
+- **stage**: The current pipeline stage name
+- **useReference**: Whether to use reference or deep copy
 
-#### `pipe.windowAsync(fn?: (input: O) => void | Promise<void>, errFn?: (error: Error) => void | Promise<void>, useReference?: boolean)`
+#### `pipe.windowAsync(normalPath?: (input: O, stage: string) => void | Promise<void>, errorPath?: (error: Error, stage: string) => void | Promise<void>, useReference?: boolean)`
 
-Adds **type-safe** asynchronous debugging/logging to the pipeline.
+Adds **type-safe** asynchronous debugging/logging to the pipeline with stage information.
+- **input**: The current pipeline value
+- **stage**: The current pipeline stage name
+- **useReference**: Whether to use reference or deep copy
 
 #### `pipe.label(stage: string)`
 
@@ -205,6 +212,8 @@ Adds a label to the current pipeline step for better error reporting and debuggi
 - **🔄 Unified API**: Single API for both sync and async operations
 - **⚡ Performance**: Optimized for both sync and async workflows
 - **🎨 Clean Code**: No need to choose between different pipeline types
+- **🔍 Enhanced Debugging**: Built-in debugging with stage tracking and error details
+- **🏗️ Modular Architecture**: Clean separation of concerns with comprehensive testing
 
 ## Development
 
