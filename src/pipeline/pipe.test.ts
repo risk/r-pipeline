@@ -291,7 +291,7 @@ describe('Pipeline', () => {
         expect(result).toStrictEqual([2, '3', 4])
       })
 
-      it('executes empty Aarray', async () => {
+      it('executes empty array', async () => {
         const pipe = Pipe.from((x: number) => x).parallelJoint([] as const)
         const result = await pipe.streamAsync(1)
         expect(result).toStrictEqual([])
