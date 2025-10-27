@@ -3,9 +3,11 @@
  * https://github.com/risk/r-pipeline
  */
 
+import { MockInstance } from 'vitest'
+
 import { Pipe } from './pipe'
 
-describe('Async Pipeline', () => {
+describe('Pipeline', () => {
   describe('Pipe', () => {
     it('Create pipe entry', () => {
       const pipe = Pipe.from((x: boolean) => !x)
@@ -78,7 +80,43 @@ describe('Async Pipeline', () => {
       expect(actual).toBe(3)
     })
 
-    it('Errror interruption repair', () => {
+    it('Window pipe with object and use reference', () => {
+      let actual: number | null = null
+      const f = (x: { v: number }) => ({ v: x.v + 1 })
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .window(
+          x => {
+            actual = x.v
+            x.v = 1000
+            return 100
+          },
+          undefined,
+          true
+        )
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream({ v: 1 })).toStrictEqual({ v: 1001 })
+      expect(actual).toBe(3)
+    })
+
+    it('Labeling pipe', () => {
+      let targetStage: string | null = null
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .label('test')
+        .window((_x, stage) => {
+          targetStage = stage
+          return 100
+        })
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream(1)).toBe(4)
+      expect(targetStage).toBe('test')
+    })
+
+    it('Error interruption repair', () => {
       const f = (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint((): number | Error => new Error('error'))
@@ -116,7 +154,7 @@ describe('Async Pipeline', () => {
       }
     })
 
-    it('Errror interruption', () => {
+    it('Error interruption', () => {
       const f = (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint((): number | Error => new Error('error'))
@@ -134,6 +172,46 @@ describe('Async Pipeline', () => {
         .joint(() => new Error('test'))
         .repair(() => new Error('recover failed'))
       expect(pipe.stream(1)).toBeInstanceOf(Error)
+    })
+
+    it('Window with thenable handler', () => {
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .window(async () => {})
+        .joint(f)
+      expect(pipe.stream(1)).toBe(3)
+      // warn message: Window handler is thenable function
+    })
+
+    describe('Pipe window thenable warning', () => {
+      let warnSpy: MockInstance<unknown[], void>
+
+      beforeEach(() => {
+        warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      })
+
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
+      it('should warn when window handler returns thenable', () => {
+        const pipe = Pipe.from((x: number) => x + 1).window(() => Promise.resolve('thenable result')) // 意図的にthenableを返す
+
+        pipe.stream(5)
+
+        // 警告が出力されたかチェック
+        expect(warnSpy).toHaveBeenCalledWith('Window handler is thenable function')
+      })
+    })
+
+    it('Recover thenable error', () => {
+      const pipe = Pipe.from(() => new Error('error')).joint(
+        x => x,
+        async error => error
+      )
+      const result = pipe.stream(1)
+      expect(result).toBeInstanceOf(Error)
+      expect(result.message).toBe('Cannot use thenable function. Please use streamAsync()')
     })
   })
 
@@ -167,7 +245,7 @@ describe('Async Pipeline', () => {
     })
   })
 
-  describe('Pipe', () => {
+  describe('Async Pipe', () => {
     it('Create pipe entry', async () => {
       const pipe = Pipe.from(async (x: boolean) => ({ b: !x }))
       expect(pipe).toBeDefined()
@@ -237,7 +315,42 @@ describe('Async Pipeline', () => {
       expect(actual).toBe(3)
     })
 
-    it('Errror interruption repair', async () => {
+    it('Window pipe with object and use reference', async () => {
+      let actual: number | null = null
+      const f = async (x: { v: number }) => ({ v: x.v + 1 })
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .windowAsync(
+          async x => {
+            actual = x.v
+            x.v = 1000
+          },
+          undefined,
+          true
+        )
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync({ v: 1 })).toStrictEqual({ v: 1001 })
+      expect(actual).toBe(3)
+    })
+
+    it('Labeling pipe', async () => {
+      let targetStage: string | null = null
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint(f)
+        .label('test')
+        .window((_x, stage) => {
+          targetStage = stage
+          return 100
+        })
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync(1)).toBe(4)
+      expect(targetStage).toBe('test')
+    })
+
+    it('Error interruption repair', async () => {
       const f = async (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint(async (): Promise<number | Error> => new Error('error'))
@@ -275,7 +388,7 @@ describe('Async Pipeline', () => {
       }
     })
 
-    it('Errror interruption', async () => {
+    it('Error interruption', async () => {
       const f = async (x: number) => x + 1
       const pipe = Pipe.from(f)
         .joint(async (): Promise<number | Error> => new Error('error'))
@@ -328,6 +441,18 @@ describe('Async Pipeline', () => {
 
       const out = await p.streamAsync(1)
       expect(out).toBe(12)
+    })
+
+    it('branch pipe', async () => {
+      const f = (x: string) => `${x}+`
+      const asyncf = async (x: string) => `${x}+`
+      const branchPipe = Pipe.from(f).joint(f)
+      const branchAsyncPipe = Pipe.from(asyncf).joint(asyncf)
+
+      const pipe = Pipe.from(f).branch(branchPipe).branchAsync(branchAsyncPipe)
+
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync('S')).toBe('S+++++')
     })
   })
 
