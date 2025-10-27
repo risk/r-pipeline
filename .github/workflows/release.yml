@@ -8,6 +8,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,11 +43,11 @@ jobs:
           body: |
             ## Changes in this release
             
-            - Unified sync/async pipeline API
-            - Added `streamAsync()`, `windowAsync()`, `branchAsync()` methods
-            - Improved type safety for mixed sync/async operations
-            - Enhanced error handling and recovery
-            - Updated documentation and examples
+            - Enhanced debugging with stage information
+            - Improved API with better parameter names
+            - Advanced error handling with detailed information
+            - Modular architecture with comprehensive testing
+            - Type system improvements with PipeResult
             
             ## Installation
             
@@ -53,5 +56,6 @@ jobs:
             ```
           draft: false
           prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
