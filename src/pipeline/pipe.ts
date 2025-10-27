@@ -56,6 +56,22 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     return new Pipe<O, R, I, RootI>(this, handler, recoverHandler)
   }
 
+  parallelJoint<
+    T extends readonly HandlerFunction<O, unknown>[],
+    R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>,
+  >(handlers: T, failFast: boolean = true, recoverHandler?: RecoverFunction<I, O>): PipeInterface<O, R, RootI> {
+    return this.joint(async (input: Input<O>): Promise<HandlerResult<R>> => {
+      const results = await Promise.all(handlers.map(handler => handler(input)))
+      if (failFast) {
+        const error = Object.values(results).find(result => result instanceof Error)
+        if (error !== undefined) {
+          return error
+        }
+      }
+      return results as HandlerResult<R>
+    }, recoverHandler)
+  }
+
   repair(recoverHandler: RecoverFunction<I, O>): PipeInterface<O, O, RootI> {
     return this.joint(x => x, recoverHandler)
   }
@@ -71,19 +87,19 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     )
   }
 
-  parallel<
-    T extends readonly ((input: Input<O>) => Promise<HandlerResult<unknown>>)[],
-    R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>,
-  >(handlers: T, failfast: boolean = true, recoverHandler?: RecoverFunction<I, O>): PipeInterface<O, R, RootI> {
+  parallelBranch<
+    T extends readonly PipeInterface<O, unknown, O>[],
+    R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]['streamAsync']>> }>,
+  >(pipes: T, failFast: boolean = true, recoverHandler?: RecoverFunction<I, O>): PipeInterface<O, R, RootI> {
     return this.joint(async (input: Input<O>): Promise<HandlerResult<R>> => {
-      const results = await Promise.all(handlers.map(handler => handler(input)))
-      if (failfast) {
+      const results = await Promise.all(pipes.map(pipe => pipe.streamAsync(input)))
+      if (failFast) {
         const error = Object.values(results).find(result => result instanceof Error)
         if (error !== undefined) {
           return error
         }
       }
-      return results as unknown as HandlerResult<R>
+      return results as HandlerResult<R>
     }, recoverHandler)
   }
 

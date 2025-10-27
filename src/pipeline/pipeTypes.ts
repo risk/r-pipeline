@@ -54,15 +54,23 @@ export type RecoverFunction<PI, R> = (
 export interface PipeInterface<I, O, RootI> {
   label(stage: string): PipeInterface<I, O, RootI>
   joint<R>(handler: HandlerFunction<O, R>, recoverHandler?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
-  repair(recoverHandler: RecoverFunction<I, O>): PipeInterface<O, O, RootI>
-  branch<R>(pipe: PipeInterface<O, R, O>, recover?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
-  branchAsync<R>(pipe: PipeInterface<O, R, O>, recover?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
-  parallel<
-    T extends readonly ((input: Input<O>) => Promise<HandlerResult<unknown>>)[],
+  parallelJoint<
+    T extends readonly HandlerFunction<O, unknown>[],
     R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>,
   >(
     handlers: T,
-    failfast?: boolean,
+    failFast?: boolean,
+    recoverHandler?: RecoverFunction<I, O>
+  ): PipeInterface<O, R, RootI>
+  repair(recoverHandler: RecoverFunction<I, O>): PipeInterface<O, O, RootI>
+  branch<R>(pipe: PipeInterface<O, R, O>, recover?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
+  branchAsync<R>(pipe: PipeInterface<O, R, O>, recover?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
+  parallelBranch<
+    T extends readonly PipeInterface<O, unknown, O>[],
+    R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]['streamAsync']>> }>,
+  >(
+    pipes: T,
+    failFast?: boolean,
     recoverHandler?: RecoverFunction<I, O>
   ): PipeInterface<O, R, RootI>
   window(
