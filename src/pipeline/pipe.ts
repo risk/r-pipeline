@@ -1,4 +1,5 @@
-/* * Copyright (c) 2025 risk
+/*
+ * Copyright (c) 2025 risk
  * Licensed under the MIT License.
  * https://github.com/risk/r-pipeline
  */
@@ -176,6 +177,8 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     if (result.kind === 'error') {
       return result.value.error
     }
+    /* c8 ignore next 4 */
+    // なんのパイプも処理しないで null に落ちるケースはありえないので到達不可
     if (this.parent === null) {
       return null
     }
@@ -197,7 +200,10 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
         parentError = parentResult.value
       } else if (parentResult.kind === 'success') {
         input = parentResult.value.value
+        /* c8 ignore next */
       } else {
+        /* c8 ignore next 4 */
+        // 前段の pipe が処理された場合、nullになることはないため到達不可
         this.result = inputError(this.stage)
         return null
       }
@@ -216,6 +222,8 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
       input = recoverResult
     }
 
+    /* c8 ignore next 5 */
+    // input は null になり得ない（Pipe の接続上 null になりえない）ので、到達不可
     if (input === null) {
       this.result = inputError(this.stage)
       return null
@@ -245,7 +253,10 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
         parentError = parentResult.value
       } else if (parentResult.kind === 'success') {
         input = parentResult.value.value
+        /* c8 ignore next */
       } else {
+        /* c8 ignore next 4 */
+        // 前段の pipe が処理された場合、nullになることはないため到達不可
         this.result = inputError(this.stage)
         return null
       }
@@ -260,6 +271,8 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
       input = recoverResult
     }
 
+    /* c8 ignore next 5 */
+    // input は null になり得ない（Pipe の接続上 null になりえない）ので、到達不可
     if (input === null) {
       this.result = inputError(this.stage)
       return null
@@ -294,11 +307,16 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     const streamError = this.getStreamError()
     if (streamError) {
       return streamError
+      /* c8 ignore next */
     }
+    /* c8 ignore next 2 */
+    // 成功も失敗もない場合は存在しない
     return new Error('Result not found')
   }
 
   stream(input: Input<RootI>): HandlerResult<O> {
+    /* c8 ignore next 4 */
+    // startがない = 実体が存在しない なので到達不可
     if (!this.start) {
       return new Error('Not executed by stream')
     }
@@ -308,6 +326,8 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
   }
 
   async streamAsync(input: Input<RootI>): Promise<HandlerResult<O>> {
+    /* c8 ignore next 4 */
+    // startがない = 実体が存在しない なので到達不可
     if (!this.start) {
       return new Error('Not executed by stream')
     }

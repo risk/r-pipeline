@@ -1,14 +1,16 @@
-/* * Copyright (c) 2025 risk
+/*
+ * Copyright (c) 2025 risk
  * Licensed under the MIT License.
  * https://github.com/risk/r-pipeline
  */
 
-import typescript from '@rollup/plugin-typescript'
-import resolve from '@rollup/plugin-node-resolve'
+import { readFileSync } from 'fs'
+
 import commonjs from '@rollup/plugin-commonjs'
+import resolve from '@rollup/plugin-node-resolve'
+import typescript from '@rollup/plugin-typescript'
 import dts from 'rollup-plugin-dts'
 
-import { readFileSync } from 'fs'
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'))
 
 export default [
