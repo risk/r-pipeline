@@ -11,6 +11,7 @@ r-pipeline is built around the idea that data should flow as types do — safely
 - 🔗 **Chainable Steps**: Compose complex data transformations with **type-safe** chaining
 - ⚡ **Unified Async Support**: **Single API** for both sync and async operations with `stream()` and `streamAsync()`
 - 🔄 **Sync + Async Mix**: Seamlessly mix synchronous and asynchronous operations in the same pipeline
+- 🚀 **Parallel Processing**: Execute multiple operations concurrently with `parallelJoint` and `parallelBranch`
 - 🛡️ **Advanced Error Handling**: Type-safe error handling with detailed error information and recovery
 - 🔍 **Enhanced Debugging**: Built-in debugging with stage information and reference control
 - 📦 **TypeScript First**: Built exclusively for TypeScript with **zero JavaScript dependencies**
@@ -107,6 +108,46 @@ const result = await mixedPipeline.streamAsync(5);  // ✅ Type-safe: result is 
 console.log(result); // "v:12"
 ```
 
+### 🚀 Parallel Processing
+
+```typescript
+// ✅ Parallel execution of multiple handlers
+const parallelPipeline = Pipe.from(async (x: number) => x)
+  .parallelJoint([
+    async (x) => x * 2,           // Handler 1
+    async (x) => x + 10,          // Handler 2
+    async (x) => `value: ${x}`,   // Handler 3
+  ])
+  .joint(([doubled, added, stringified]) => ({
+    doubled,
+    added,
+    stringified
+  }));
+
+const result = await parallelPipeline.streamAsync(5);
+// Result: { doubled: 10, added: 15, stringified: "value: 5" }
+```
+
+### 🌿 Parallel Branch Processing
+
+```typescript
+// ✅ Parallel execution of multiple pipelines
+const branch1 = Pipe.from(async (x: number) => x * 2);
+const branch2 = Pipe.from(async (x: number) => x + 10);
+const branch3 = Pipe.from(async (x: number) => `value: ${x}`);
+
+const parallelBranchPipeline = Pipe.from(async (x: number) => x)
+  .parallelBranch([branch1, branch2, branch3])
+  .joint(([doubled, added, stringified]) => ({
+    doubled,
+    added,
+    stringified
+  }));
+
+const result = await parallelBranchPipeline.streamAsync(5);
+// Result: { doubled: 10, added: 15, stringified: "value: 5" }
+```
+
 ### 🛡️ Type-Safe Error Handling with Async
 
 ```typescript
@@ -158,6 +199,14 @@ Adds a new **type-safe** step to the pipeline with optional error recovery.
 - **R**: New step output type (automatically inferred)
 - **Supports**: Both sync and async functions
 
+#### `pipe.parallelJoint<T, R>(handlers: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)`
+
+Executes multiple handlers in parallel with **type-safe** results.
+- **T**: Array of handler functions (automatically inferred)
+- **R**: Tuple type of all handler results (automatically inferred)
+- **failFast**: Whether to fail immediately on first error (default: true)
+- **Supports**: Both sync and async handlers
+
 #### `pipe.branch<R>(pipe: Pipe<O, R, never, O>, recoverHandler?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
 Adds a **type-safe** branch pipeline for synchronous operations.
@@ -165,6 +214,14 @@ Adds a **type-safe** branch pipeline for synchronous operations.
 #### `pipe.branchAsync<R>(pipe: Pipe<O, R, never, O>, recoverHandler?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
 Adds a **type-safe** branch pipeline for asynchronous operations.
+
+#### `pipe.parallelBranch<T, R>(pipes: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)`
+
+Executes multiple pipelines in parallel with **type-safe** results.
+- **T**: Array of pipeline instances (automatically inferred)
+- **R**: Tuple type of all pipeline results (automatically inferred)
+- **failFast**: Whether to fail immediately on first error (default: true)
+- **Supports**: Both sync and async pipelines
 
 ### **Execution Methods**
 
@@ -214,6 +271,7 @@ Adds a label to the current pipeline step for better error reporting and debuggi
 - **🎨 Clean Code**: No need to choose between different pipeline types
 - **🔍 Enhanced Debugging**: Built-in debugging with stage tracking and error details
 - **🏗️ Modular Architecture**: Clean separation of concerns with comprehensive testing
+- **🚀 Parallel Processing**: Execute multiple operations concurrently for maximum performance
 
 ## Development
 

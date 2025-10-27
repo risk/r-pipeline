@@ -270,6 +270,60 @@ describe('Pipeline', () => {
       expect(await pipe.streamAsync(1)).toBe(4)
     })
 
+    describe('Parallel joint', () => {
+      it('executes multiple async handlers in parallel', async () => {
+        const pipe = Pipe.from((x: number) => x).parallelJoint([
+          async x => x + 1,
+          async x => (x + 2).toString(),
+          async x => x + 3,
+        ] as const)
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual([2, '3', 4])
+      })
+
+      it('executes multiple sync and async handlers in parallel', async () => {
+        const pipe = Pipe.from((x: number) => x).parallelJoint([
+          async x => x + 1,
+          x => (x + 2).toString(),
+          async x => x + 3,
+        ] as const)
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual([2, '3', 4])
+      })
+
+      it('executes empty array', async () => {
+        const pipe = Pipe.from((x: number) => x).parallelJoint([] as const)
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual([])
+      })
+
+      it('stops early on failfast error', async () => {
+        const pipe = Pipe.from((x: number) => x)
+          .parallelJoint([async x => x + 1, async () => new Error('error')] as const)
+          .joint(() => 'should not run')
+        const result = await pipe.streamAsync(1)
+        expect(result).toBeInstanceOf(Error)
+      })
+
+      it('continues on error when failfast is false', async () => {
+        const pipe = Pipe.from((x: number) => x).parallelJoint(
+          [async x => x + 1, async () => new Error('error')] as const,
+          false
+        )
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual([2, new Error('error')])
+      })
+
+      it('runs recover handler when parallel fails', async () => {
+        const recover = vi.fn((e: Error) => e)
+        const pipe = Pipe.from((x: number) => x)
+          .parallelJoint([async () => new Error('fail')] as const, true)
+          .repair(recover)
+        await pipe.streamAsync(1)
+        expect(recover).toHaveBeenCalled()
+      })
+    })
+
     it('branch pipe', async () => {
       const f = async (x: string) => `${x}+`
       const branchPipe = Pipe.from(f).joint(f)
@@ -277,6 +331,37 @@ describe('Pipeline', () => {
 
       expect(pipe).toBeDefined()
       expect(await pipe.streamAsync('S')).toBe('S++++')
+    })
+
+    describe('Parallel branch', () => {
+      it('executes multiple pipes in parallel', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (x: number) => x * 2)
+        const sub3 = Pipe.from(async (x: number) => x.toString())
+
+        const pipe = Pipe.from((x: number) => x).parallelBranch([sub1, sub2, sub3] as const)
+        const result = await pipe.streamAsync(3)
+
+        expect(result).toStrictEqual([4, 6, '3'])
+      })
+
+      it('stops early on failfast', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (_x: number) => new Error('error'))
+
+        const pipe = Pipe.from((x: number) => x).parallelBranch([sub1, sub2] as const)
+        const result = await pipe.streamAsync(3)
+        expect(result).toBeInstanceOf(Error)
+      })
+
+      it('continues when failfast = false', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (_x: number) => new Error('error'))
+
+        const pipe = Pipe.from((x: number) => x).parallelBranch([sub1, sub2] as const, false)
+        const result = await pipe.streamAsync(3)
+        expect(result).toStrictEqual([4, new Error('error')])
+      })
     })
 
     it('Window pipe', async () => {

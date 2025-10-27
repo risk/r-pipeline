@@ -105,5 +105,64 @@ async function main() {
   const x3MixPipe = baseAsyncPipe.branchAsync(subAsyncPipeX3)
   console.log(await x3MixPipe.streamAsync(2))
   // output -> { x3: 6, x6: 12, x9: 18 }
+
+  // Parallel
+  const parallelPipe = Pipe.from((x: number) => x)
+    .parallelJoint([async x => x + 1, async x => (x + 2).toString(), async x => x + 3] as const)
+    .joint(x => {
+      console.log(x)
+      return x
+    })
+  console.log(await parallelPipe.streamAsync(1))
+  // output -> [ 2, '3', 4 ]
+
+  // Fail fast
+  const parallelPipeWithFailFast = Pipe.from((x: number) => x)
+    .parallelJoint([async x => x + 1, async x => (x + 2).toString(), async () => new Error('error')] as const)
+    .joint(x => {
+      console.log('parallelPipeWithFailFast', x)
+      return x
+    })
+  console.log(await parallelPipeWithFailFast.streamAsync(1))
+  // output -> Error: error ...
+
+  // Continue on Fail
+  const parallelPipeContinueOnFail = Pipe.from((x: number) => x)
+    .parallelJoint([async x => x + 1, async x => (x + 2).toString(), async () => new Error('error')] as const, false)
+    .joint(x => {
+      console.log('parallelPipeContinueOnFail', x)
+      return x
+    })
+  console.log(await parallelPipeContinueOnFail.streamAsync(1))
+  // output -> [ 2, '3', Error: error ... ]
+
+  // Parallel branch pipeps
+  const parallelJointPipe = Pipe.from((x: number) => x)
+    .parallelBranch([
+      Pipe.from(async (x: number) => x + 1).joint(async x => x + 1),
+      Pipe.from(async (x: number) => x + 2).joint(async x => (x + 2).toString()),
+    ] as const)
+    .joint(x => {
+      console.log('parallelPipeJointPipe', x)
+      return x
+    })
+  console.log(await parallelJointPipe.streamAsync(1))
+
+  // Parallel branch pipeps (delay)
+  const parallelJointPipeDelay = Pipe.from((x: number) => x)
+    .parallelBranch([
+      Pipe.from(async (x: number) => x + 1).joint(async x => x + 1),
+      Pipe.from(async () => {
+        const delay = 1000
+        new Promise(resolve => setTimeout(resolve, delay))
+        return `delay: ${delay}`
+      }),
+      Pipe.from(async (x: number) => x + 2).joint(async x => (x + 2).toString()),
+    ] as const)
+    .joint(x => {
+      console.log('parallelJointPipeDelay', x)
+      return x
+    })
+  console.log(await parallelJointPipeDelay.streamAsync(1))
 }
 main()

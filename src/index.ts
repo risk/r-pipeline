@@ -4,3 +4,4 @@
  */
 
 export * from './pipeline/pipe'
+export * from './pipeline/pipeTypes'
