@@ -64,6 +64,26 @@ describe('Pipeline', () => {
       expect(actual).toBe(3)
     })
 
+    it('Window pipe with error default func', () => {
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint((): number | Error => new Error('error'))
+        .window()
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream(1)).toBeInstanceOf(Error)
+    })
+
+    it('Window pipe with error func', () => {
+      const f = (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint((): number | Error => new Error('error'))
+        .window(undefined, (e, stage) => console.log(`${stage}: ${e.message}`))
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(pipe.stream(1)).toBeInstanceOf(Error)
+    })
+
     it('Window pipe with object', () => {
       let actual: number | null = null
       const f = (x: { v: number }) => ({ v: x.v + 1 })
@@ -174,15 +194,6 @@ describe('Pipeline', () => {
       expect(pipe.stream(1)).toBeInstanceOf(Error)
     })
 
-    it('Window with thenable handler', () => {
-      const f = (x: number) => x + 1
-      const pipe = Pipe.from(f)
-        .window(async () => {})
-        .joint(f)
-      expect(pipe.stream(1)).toBe(3)
-      // warn message: Window handler is thenable function
-    })
-
     describe('Pipe window thenable warning', () => {
       let warnSpy: MockInstance<unknown[], void>
 
@@ -196,6 +207,15 @@ describe('Pipeline', () => {
 
       it('should warn when window handler returns thenable', () => {
         const pipe = Pipe.from((x: number) => x + 1).window(() => Promise.resolve('thenable result')) // 意図的にthenableを返す
+
+        pipe.stream(5)
+
+        // 警告が出力されたかチェック
+        expect(warnSpy).toHaveBeenCalledWith('Window handler is thenable function')
+      })
+
+      it('should warn when window error handler returns thenable', () => {
+        const pipe = Pipe.from((): number | Error => new Error('error')).window(undefined, async () => {})
 
         pipe.stream(5)
 
@@ -383,6 +403,26 @@ describe('Pipeline', () => {
       expect(pipe).toBeDefined()
       expect(await pipe.streamAsync(1)).toBe(4)
       expect(actual).toBe(3)
+    })
+
+    it('Window pipe with error default func', async () => {
+      const f = async (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint((): number | Error => new Error('error'))
+        .windowAsync()
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync(1)).toBeInstanceOf(Error)
+    })
+
+    it('Window pipe with error func', async () => {
+      const f = async (x: number) => x + 1
+      const pipe = Pipe.from(f)
+        .joint((): number | Error => new Error('error'))
+        .windowAsync(undefined, (e, stage) => console.log(`${stage}: ${e.message}`))
+        .joint(f)
+      expect(pipe).toBeDefined()
+      expect(await pipe.streamAsync(1)).toBeInstanceOf(Error)
     })
 
     it('Window pipe with object', async () => {
