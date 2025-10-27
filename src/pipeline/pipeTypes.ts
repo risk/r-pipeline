@@ -57,6 +57,14 @@ export interface PipeInterface<I, O, RootI> {
   repair(recoverHandler: RecoverFunction<I, O>): PipeInterface<O, O, RootI>
   branch<R>(pipe: PipeInterface<O, R, O>, recover?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
   branchAsync<R>(pipe: PipeInterface<O, R, O>, recover?: RecoverFunction<I, O>): PipeInterface<O, R, RootI>
+  parallel<
+    T extends readonly ((input: Input<O>) => Promise<HandlerResult<unknown>>)[],
+    R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>,
+  >(
+    handlers: T,
+    failfast?: boolean,
+    recoverHandler?: RecoverFunction<I, O>
+  ): PipeInterface<O, R, RootI>
   window(
     normalPath?: (arg: Input<O>, stage: string) => void,
     errPath?: (error: Error, stage: string) => void,

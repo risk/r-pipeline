@@ -6,6 +6,7 @@
 import { MockInstance } from 'vitest'
 
 import { Pipe } from './pipe'
+import { HandlerResult } from './pipeTypes'
 
 describe('Pipeline', () => {
   describe('Pipe', () => {
@@ -40,6 +41,44 @@ describe('Pipeline', () => {
 
       expect(pipe).toBeDefined()
       expect(pipe.stream('S')).toBe('S++++')
+    })
+
+    describe('Pipe.parallel', () => {
+      it('executes multiple async handlers in parallel', async () => {
+        const pipe = Pipe.from((x: number) => x).parallel([
+          async x => x + 1,
+          async x => (x + 2).toString(),
+          async x => x + 3,
+        ] as const)
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual([2, '3', 4])
+      })
+
+      it('stops early on failfast error', async () => {
+        const pipe = Pipe.from((x: number) => x)
+          .parallel([async x => x + 1, async () => new Error('error')] as const)
+          .joint(() => 'should not run')
+        const result = await pipe.streamAsync(1)
+        expect(result).toBeInstanceOf(Error)
+      })
+
+      it('continues on error when failfast is false', async () => {
+        const pipe = Pipe.from((x: number) => x).parallel(
+          [async x => x + 1, async () => new Error('error')] as const,
+          false
+        )
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual([2, new Error('error')])
+      })
+
+      it('runs recover handler when parallel fails', async () => {
+        const recover = vi.fn((e: Error) => e)
+        const pipe = Pipe.from((x: number) => x)
+          .parallel([async () => new Error('fail')] as const, true)
+          .repair(recover)
+        await pipe.streamAsync(1)
+        expect(recover).toHaveBeenCalled()
+      })
     })
 
     it('Window pipe', () => {
