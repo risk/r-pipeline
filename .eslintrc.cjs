@@ -1,7 +1,9 @@
-/* * Copyright (c) 2025 risk
+/*
+ * Copyright (c) 2025 risk
  * Licensed under the MIT License.
  * https://github.com/risk/r-pipeline
  */
+
 module.exports = {
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -38,6 +40,7 @@ module.exports = {
       'error',
       'block',
       [
+        '',
         ' * Copyright (c) 2025 risk',
         ' * Licensed under the MIT License.',
         ' * https://github.com/risk/r-pipeline',
