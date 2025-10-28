@@ -8,16 +8,18 @@ r-pipeline is built around the idea that data should flow as types do — safely
 
 ## 🎯 Key Features
 
-- 🔒 **Type-Safe Pipeline**: **Complete type safety** from input to output with automatic type inference
-- 🚀 **Zero Runtime Errors**: Compile-time type checking prevents runtime errors
-- 🔗 **Chainable Steps**: Compose complex data transformations with **type-safe** chaining
-- ⚡ **Unified Async Support**: **Single API** for both sync and async operations with `stream()` and `streamAsync()`
-- 🔄 **Sync + Async Mix**: Seamlessly mix synchronous and asynchronous operations in the same pipeline
-- 🚀 **Parallel Processing**: Execute multiple operations concurrently with `parallelJoint` and `parallelBranch`
-- 🛡️ **Advanced Error Handling**: Type-safe error handling with detailed error information and recovery
-- 🔍 **Enhanced Debugging**: Built-in debugging with stage information and reference control
-- 📦 **TypeScript First**: Built exclusively for TypeScript with **zero JavaScript dependencies**
-- 🧪 **Well Tested**: Comprehensive test coverage with modular architecture
+- 🔒 **Type-Safe Pipeline** — **Complete type safety** from input to output with automatic type inference
+- 🚀 **Zero Runtime Errors** — Compile-time type checking prevents runtime errors
+- 🔗 **Chainable Steps** — Compose complex data transformations with **type-safe** chaining
+- ⚡ **Unified Async Support** — **Single API** for both sync and async operations with `stream()` and `streamAsync()`
+- 🔄 **Sync + Async Mix** — Seamlessly mix synchronous and asynchronous operations in the same pipeline
+- 🚀 **Parallel Processing** — Execute multiple operations concurrently with `parallelJoint` and `parallelBranch`
+- 🛡️ **Advanced Error Handling** — Type-safe error handling with detailed error information and recovery
+- 🔍 **Enhanced Debugging** — Built-in debugging with stage information and reference control
+- 📦 **TypeScript First** — Built exclusively for TypeScript with **zero JavaScript dependencies**
+- 🧩 **Zero Runtime Dependencies** — Fully self-contained, built only with TypeScript’s type system and JavaScript primitives
+- 🧪 **Well Tested** — Comprehensive test coverage with modular architecture
+
 
 ## ⚙️ Error Handling Philosophy
 
