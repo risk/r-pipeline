@@ -21,17 +21,17 @@ r-pipeline is built around the idea that data should flow as types do — safely
 - 🧪 **Well Tested** — Comprehensive test coverage with modular architecture
 
 
-## ⚙️ Error Handling Philosophy
+## ⚙️ Error Handling Design
 
-r-pipeline does not use throw for error handling.
-Instead, errors are treated as values and passed through the pipeline just like any other data.
+r-pipeline does not use `throw` for error handling.  
+Instead, errors are treated as values and passed through the pipeline just like any other data.  
 This ensures deterministic, composable behavior and keeps control flow fully explicit.
 
-Throwing an error represents a deliberate choice to exit the pipeline
+Throwing an error represents a deliberate choice to exit the pipeline  
 and delegate the exception to the outer world.
 
-This design is realized through r-pipeline itself,
-enabling predictable data flow, functional-style composition,
+This design is realized through r-pipeline itself,  
+enabling predictable data flow, functional-style composition,  
 and resilient async orchestration.
 
 ## Installation
