@@ -55,10 +55,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/riskrisk/r-pipeline.git"
+    "url": "git+https://github.com/risk/r-pipeline.git"
   },
   "bugs": {
-    "url": "https://github.com/riskrisk/r-pipeline/issues"
+    "url": "https://github.com/risk/r-pipeline/issues"
   },
-  "homepage": "https://github.com/riskrisk/r-pipeline#readme"
+  "homepage": "https://github.com/risk/r-pipeline#readme"
 }
