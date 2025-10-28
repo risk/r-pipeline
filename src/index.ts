@@ -6,3 +6,5 @@
 
 export * from './pipeline/pipe'
 export * from './pipeline/pipeTypes'
+export * from './layer/layer'
+export * from './layer/layerTypes'
