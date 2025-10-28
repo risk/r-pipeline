@@ -196,7 +196,7 @@ describe('Pipeline', () => {
     })
 
     describe('Pipe window thenable warning', () => {
-      let warnSpy: MockInstance<unknown[], void>
+      let warnSpy: MockInstance
 
       beforeEach(() => {
         warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
