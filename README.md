@@ -1,5 +1,7 @@
 # r-pipeline
 
+**Note**: Sorry for the confusion with the homepage and repository URLs in the previous versions. They have been corrected in the latest release.
+
 A **Type-Safe** TypeScript utility library for creating and managing data processing pipelines with unified sync/async support.
 
 r-pipeline is built around the idea that data should flow as types do — safely, predictably, and with responsibility. Now with **unified sync/async pipeline support** in a single, powerful API.
