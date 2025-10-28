@@ -10,7 +10,7 @@ type LayerEntry<I> = (input: Input<I>) => HandlerResult<I> | Promise<HandlerResu
 type LayerExit<O> = (output: HandlerResult<O>) => HandlerResult<O> | Promise<HandlerResult<O>>
 
 export interface LayerInterface<I, O, C = undefined> {
-  entry: LayerEntry<I> | undefined
-  exit: LayerExit<O> | undefined
+  entry: LayerEntry<I>
+  exit: LayerExit<O>
   context: C | undefined
 }
