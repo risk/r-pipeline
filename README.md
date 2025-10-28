@@ -14,10 +14,11 @@ r-pipeline is built around the idea that data should flow as types do — safely
 - ⚡ **Unified Async Support** — **Single API** for both sync and async operations with `stream()` and `streamAsync()`
 - 🔄 **Sync + Async Mix** — Seamlessly mix synchronous and asynchronous operations in the same pipeline
 - 🚀 **Parallel Processing** — Execute multiple operations concurrently with `parallelJoint` and `parallelBranch`
+- 🏗️ **Layer Architecture** — Advanced middleware pattern with entry/exit hooks and context support
 - 🛡️ **Advanced Error Handling** — Type-safe error handling with detailed error information and recovery
 - 🔍 **Enhanced Debugging** — Built-in debugging with stage information and reference control
 - 📦 **TypeScript First** — Built exclusively for TypeScript with **zero JavaScript dependencies**
-- 🧩 **Zero Runtime Dependencies** — Fully self-contained, built only with TypeScript’s type system and JavaScript primitives
+- 🧩 **Zero Runtime Dependencies** — Fully self-contained, built only with TypeScript's type system and JavaScript primitives
 - 🧪 **Well Tested** — Comprehensive test coverage with modular architecture
 
 
@@ -198,6 +199,136 @@ const result = await asyncPipeline.streamAsync(5);
 console.log(result); // 33
 ```
 
+## 🏗️ Layer Architecture
+
+r-pipeline includes a powerful **Layer Architecture** that provides middleware-like functionality with entry/exit hooks and context support.
+
+### **Layer Concept**
+
+Layers wrap handlers with **entry** and **exit** functions that execute before and after the main handler, enabling:
+- **Logging & Monitoring**: Track data flow and performance
+- **Authentication & Authorization**: Validate inputs and outputs
+- **Data Transformation**: Pre/post processing
+- **Error Handling**: Custom error recovery and logging
+
+### **Basic Layer Usage**
+
+```typescript
+import { Pipe, makeLayer, stackLayer } from 'r-pipeline';
+
+// Create a logging layer
+const loggingLayer = makeLayer(
+  (input: number, context) => {
+    console.log(`[${context?.name}] Entry:`, input);
+    return input + 1; // Transform input
+  },
+  (output: string, context) => {
+    console.log(`[${context?.name}] Exit:`, output);
+    return `processed: ${output}`; // Transform output
+  },
+  { name: 'Logger' } // Context
+);
+
+// Use with Pipe
+const pipe = Pipe.from(stackLayer(loggingLayer)(x => x.toString()))
+  .joint(x => x.toUpperCase());
+
+const result = pipe.stream(5);
+// Console: [Logger] Entry: 5
+// Console: [Logger] Exit: 6
+// Result: "processed: 6"
+```
+
+### **Multiple Layers**
+
+```typescript
+// Create multiple layers
+const authLayer = makeLayer(
+  (input: number) => {
+    console.log('Auth check:', input);
+    return input;
+  },
+  (output: string) => {
+    console.log('Auth verified:', output);
+    return output;
+  }
+);
+
+const loggingLayer = makeLayer(
+  (input: number) => {
+    console.log('Logging:', input);
+    return input;
+  },
+  (output: string) => {
+    console.log('Logged:', output);
+    return output;
+  }
+);
+
+// Stack multiple layers
+const pipe = Pipe.from(stackLayer([authLayer, loggingLayer])(x => x.toString()));
+
+const result = pipe.stream(10);
+// Console: Auth check: 10
+// Console: Logging: 10
+// Console: Logged: 10
+// Console: Auth verified: 10
+// Result: "10"
+```
+
+### **Async Layers**
+
+```typescript
+import { makeAsyncLayer, stackAsyncLayer } from 'r-pipeline';
+
+// Create async layer
+const asyncLayer = makeAsyncLayer(
+  async (input: number) => {
+    console.log('Async entry:', input);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return input + 1;
+  },
+  async (output: string) => {
+    console.log('Async exit:', output);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return `async: ${output}`;
+  }
+);
+
+// Use with async pipeline
+const pipe = Pipe.from(stackAsyncLayer(asyncLayer)(async x => x.toString()));
+
+const result = await pipe.streamAsync(5);
+// Console: Async entry: 5
+// Console: Async exit: 6
+// Result: "async: 6"
+```
+
+### **Layer with Error Handling**
+
+```typescript
+const errorHandlingLayer = makeLayer(
+  (input: number) => {
+    if (input < 0) {
+      return new Error('Negative input not allowed');
+    }
+    return input;
+  },
+  (output: string | Error) => {
+    if (output instanceof Error) {
+      console.error('Layer caught error:', output.message);
+      return 'error-handled';
+    }
+    return output;
+  }
+);
+
+const pipe = Pipe.from(stackLayer(errorHandlingLayer)(x => x.toString()));
+
+const result1 = pipe.stream(5);  // Result: "5"
+const result2 = pipe.stream(-1); // Result: "error-handled"
+```
+
 ## 🔒 Type-Safe API Reference
 
 ### **Unified Pipeline API**
@@ -240,6 +371,41 @@ Executes multiple pipelines in parallel with **type-safe** results.
 - **failFast**: Whether to fail immediately on first error (default: true)
 - **Supports**: Both sync and async pipelines
 
+### **Layer API**
+
+#### `makeLayer<I, O, C>(entry?: (input: Input<I>, context?: C) => HandlerResult<I>, exit?: (output: HandlerResult<O>, context?: C) => HandlerResult<O>, context?: C)`
+
+Creates a **type-safe** synchronous layer with entry/exit hooks and context support.
+- **I**: Input type (automatically inferred)
+- **O**: Output type (automatically inferred)
+- **C**: Context type (optional)
+- **entry**: Function executed before the main handler
+- **exit**: Function executed after the main handler
+- **context**: Shared context object passed to entry/exit functions
+
+#### `makeAsyncLayer<I, O, C>(entry?: (input: Input<I>, context?: C) => HandlerResult<I> | Promise<HandlerResult<I>>, exit?: (output: HandlerResult<O>, context?: C) => HandlerResult<O> | Promise<HandlerResult<O>>, context?: C)`
+
+Creates a **type-safe** asynchronous layer with entry/exit hooks and context support.
+- **I**: Input type (automatically inferred)
+- **O**: Output type (automatically inferred)
+- **C**: Context type (optional)
+- **entry**: Async function executed before the main handler
+- **exit**: Async function executed after the main handler
+- **context**: Shared context object passed to entry/exit functions
+
+#### `stackLayer<I, O, C>(layer: LayerInterface<I, O, C> | LayerInterface<I, O, C>[], name?: string)`
+
+Creates a **type-safe** synchronous layer stack that wraps a handler.
+- **layer**: Single layer or array of layers to stack
+- **name**: Optional name for error reporting
+- **Returns**: Function that wraps a handler with the layer stack
+
+#### `stackAsyncLayer<I, O, C>(layer: LayerInterface<I, O, C> | LayerInterface<I, O, C>[])`
+
+Creates a **type-safe** asynchronous layer stack that wraps a handler.
+- **layer**: Single layer or array of layers to stack
+- **Returns**: Function that wraps an async handler with the layer stack
+
 ### **Execution Methods**
 
 #### `pipe.stream(input: I): O | Error`
@@ -281,6 +447,7 @@ Adds a label to the current pipeline step for better error reporting and debuggi
 - **🔒 Compile-time Safety**: Catch errors before runtime
 - **⚡ IntelliSense Support**: Full autocomplete and type hints
 - **🛡️ Error Prevention**: Type-safe error handling prevents runtime crashes
+- **🏗️ Layer Architecture**: Advanced middleware pattern with entry/exit hooks
 - **📈 Developer Experience**: Better refactoring and maintenance
 - **🎯 Zero Runtime Errors**: TypeScript compiler ensures correctness
 - **🔄 Unified API**: Single API for both sync and async operations
