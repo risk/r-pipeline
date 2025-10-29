@@ -1,4 +1,7 @@
 # r-pipeline
+[![npm version](https://img.shields.io/npm/v/r-pipeline.svg)](https://www.npmjs.com/package/r-pipeline)
+[![npm downloads](https://img.shields.io/npm/dw/r-pipeline.svg)](https://www.npmjs.com/package/r-pipeline)
+![Type Definitions](https://img.shields.io/badge/types-TypeScript-blue)
 
 A **Type-Safe** TypeScript utility library for creating and managing data processing pipelines with unified sync/async support.
 
@@ -7,11 +10,11 @@ r-pipeline is built around the idea that data should flow as types do — safely
 ## 🎯 Key Features
 
 - 🔒 **Type-Safe Pipeline** — **Complete type safety** from input to output with automatic type inference
-- 🚀 **Zero Runtime Errors** — Compile-time type checking prevents runtime errors
+- ✅ **Compile-Time Guarantees** — Most mistakes are caught before runtime
 - 🔗 **Chainable Steps** — Compose complex data transformations with **type-safe** chaining
 - ⚡ **Unified Async Support** — **Single API** for both sync and async operations with `stream()` and `streamAsync()`
 - 🔄 **Sync + Async Mix** — Seamlessly mix synchronous and asynchronous operations in the same pipeline
-- 🚀 **Parallel Processing** — Execute multiple operations concurrently with `parallelJoint` and `parallelBranch`
+- 🚀 **Keyed Parallel Processing** — Execute multiple operations concurrently with meaningful keys using `keyedParallelJoint` and `keyedParallelBranch`
 - 🏗️ **Layer Architecture** — Advanced middleware pattern with entry/exit hooks and context support
 - 🛡️ **Advanced Error Handling** — Type-safe error handling with detailed error information and recovery
 - 🔍 **Enhanced Debugging** — Built-in debugging with stage information and reference control
@@ -34,6 +37,8 @@ enabling predictable data flow, functional-style composition,
 and resilient async orchestration.
 
 ## Installation
+
+**Env**: Node 18+ / TS 5.3+ (ES2020 target recommended)
 
 ```bash
 npm install r-pipeline
@@ -124,45 +129,73 @@ const result = await mixedPipeline.streamAsync(5);  // ✅ Type-safe: result is 
 console.log(result); // "v:12"
 ```
 
-### 🚀 Parallel Processing
+### 🚀 Parallel Processing (order-independent)
+
+#### **Keyed Parallel Joint** — order-independent, key-addressable (Recommended)
 
 ```typescript
-// ✅ Parallel execution of multiple handlers
+// ✅ Parallel execution with meaningful keys
 const parallelPipeline = Pipe.from(async (x: number) => x)
-  .parallelJoint([
-    async (x) => x * 2,           // Handler 1
-    async (x) => x + 10,          // Handler 2
-    async (x) => `value: ${x}`,   // Handler 3
-  ])
-  .joint(([doubled, added, stringified]) => ({
-    doubled,
-    added,
-    stringified
-  }));
+  .keyedParallelJoint({
+    doubled: async (x) => x * 2,
+    added: async (x) => x + 10,
+    stringified: async (x) => `value: ${x}`,
+  });
 
 const result = await parallelPipeline.streamAsync(5);
 // Result: { doubled: 10, added: 15, stringified: "value: 5" }
+// ✅ Access with meaningful keys: result.doubled, result.added, result.stringified
 ```
 
-### 🌿 Parallel Branch Processing
+#### **Keyed Parallel Branch** — order-independent, key-addressable (Recommended)
 
 ```typescript
-// ✅ Parallel execution of multiple pipelines
+// ✅ Parallel execution of multiple pipelines with meaningful keys
 const branch1 = Pipe.from(async (x: number) => x * 2);
 const branch2 = Pipe.from(async (x: number) => x + 10);
 const branch3 = Pipe.from(async (x: number) => `value: ${x}`);
 
 const parallelBranchPipeline = Pipe.from(async (x: number) => x)
-  .parallelBranch([branch1, branch2, branch3])
-  .joint(([doubled, added, stringified]) => ({
-    doubled,
-    added,
-    stringified
-  }));
+  .keyedParallelBranch({
+    doubled: branch1,
+    added: branch2,
+    stringified: branch3,
+  });
 
 const result = await parallelBranchPipeline.streamAsync(5);
 // Result: { doubled: 10, added: 15, stringified: "value: 5" }
+// ✅ Access with meaningful keys: result.doubled, result.added, result.stringified
 ```
+
+#### **Error Handling with Parallel Processing**
+
+```typescript
+// ✅ Fail-fast mode (default: stops on first error)
+const failFastPipeline = Pipe.from(async (x: number) => x)
+  .keyedParallelJoint({
+    success: async (x) => x * 2,
+    error: async () => new Error('failure'),
+  });
+
+const result1 = await failFastPipeline.streamAsync(5);
+// Result: Error('failure')
+
+// ✅ Continue mode (collects all results, including errors)
+const continuePipeline = Pipe.from(async (x: number) => x)
+  .keyedParallelJoint(
+    {
+      success: async (x) => x * 2,
+      error: async () => new Error('failure'),
+    },
+    false // failFast = false
+  );
+
+const result2 = await continuePipeline.streamAsync(5);
+// Result: { success: 10, error: Error('failure') }
+```
+
+> **Deprecated**: `parallelJoint` / `parallelBranch` are superseded by the keyed variants.  
+> They may be removed in a future major release. Please migrate to `keyedParallelJoint` / `keyedParallelBranch`.
 
 ### 🛡️ Type-Safe Error Handling with Async
 
@@ -195,6 +228,43 @@ const asyncPipeline = Pipe.from(async (x: number) => x * 2)
 const result = await asyncPipeline.streamAsync(5);
 // Output: no name async debug: 11
 console.log(result); // 33
+```
+
+### 🛠️ HandlerResult Type Guards
+
+```typescript
+import { isHandlerError, isHandlerSuccess, HandlerResult } from 'r-pipeline';
+
+const result: HandlerResult<string> = await pipe.streamAsync(input);
+
+// ✅ Type-safe error checking
+if (isHandlerError(result)) {
+  console.error('Pipeline failed:', result.message);
+  // TypeScript knows: result is Error
+  return;
+}
+
+// ✅ Type-safe success handling
+if (isHandlerSuccess(result)) {
+  console.log('Success:', result);
+  // TypeScript knows: result is string (not Error)
+  return result.toUpperCase();
+}
+
+// ✅ Usage with parallel processing
+const results = await pipe.keyedParallelJoint({
+  user: fetchUser,
+  posts: fetchPosts,
+}).streamAsync(userId);
+
+// Type-safe result checking
+if (isHandlerError(results)) {
+  console.error('Error:', results.message);
+} else {
+  // TypeScript knows: results is { user: User, posts: Post[] }
+  console.log('User:', results.user);
+  console.log('Posts:', results.posts);
+}
 ```
 
 ## 🏗️ Layer Architecture
@@ -345,13 +415,23 @@ Adds a new **type-safe** step to the pipeline with optional error recovery.
 - **R**: New step output type (automatically inferred)
 - **Supports**: Both sync and async functions
 
-#### `pipe.parallelJoint<T, R>(handlers: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)`
+#### `pipe.keyedParallelJoint<T>(handlers: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)`
 
-Executes multiple handlers in parallel with **type-safe** results.
-- **T**: Array of handler functions (automatically inferred)
-- **R**: Tuple type of all handler results (automatically inferred)
+Executes multiple handlers in parallel with **type-safe** keyed results. **Recommended** over `parallelJoint`.
+- **T**: Object of handler functions with meaningful keys (automatically inferred)
+- **Returns**: Object with same keys as input, containing each handler's result
 - **failFast**: Whether to fail immediately on first error (default: true)
 - **Supports**: Both sync and async handlers
+- **Example**: `{ doubled: (x) => x * 2, added: (x) => x + 10 }` → `{ doubled: 10, added: 15 }`
+
+#### `pipe.keyedParallelBranch<T>(pipes: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)`
+
+Executes multiple pipelines in parallel with **type-safe** keyed results. **Recommended** over `parallelBranch`.
+- **T**: Object of pipeline instances with meaningful keys (automatically inferred)
+- **Returns**: Object with same keys as input, containing each pipeline's result
+- **failFast**: Whether to fail immediately on first error (default: true)
+- **Supports**: Both sync and async pipelines
+- **Example**: `{ doubled: pipe1, added: pipe2 }` → `{ doubled: 10, added: 15 }`
 
 #### `pipe.branch<R>(pipe: Pipe<O, R, never, O>, recoverHandler?: (error: Error, parentInput: I | null) => R | Error | Promise<R | Error>)`
 
@@ -361,9 +441,21 @@ Adds a **type-safe** branch pipeline for synchronous operations.
 
 Adds a **type-safe** branch pipeline for asynchronous operations.
 
-#### `pipe.parallelBranch<T, R>(pipes: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)`
+#### `pipe.parallelJoint<T, R>(handlers: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)` ⚠️ Deprecated
 
-Executes multiple pipelines in parallel with **type-safe** results.
+> **Deprecated**: Use `keyedParallelJoint` instead. This method will be removed in a future version.
+
+Executes multiple handlers in parallel with **type-safe** array results.
+- **T**: Array of handler functions (automatically inferred)
+- **R**: Tuple type of all handler results (automatically inferred)
+- **failFast**: Whether to fail immediately on first error (default: true)
+- **Supports**: Both sync and async handlers
+
+#### `pipe.parallelBranch<T, R>(pipes: T, failFast?: boolean, recoverHandler?: RecoverFunction<I, O>)` ⚠️ Deprecated
+
+> **Deprecated**: Use `keyedParallelBranch` instead. This method will be removed in a future version.
+
+Executes multiple pipelines in parallel with **type-safe** array results.
 - **T**: Array of pipeline instances (automatically inferred)
 - **R**: Tuple type of all pipeline results (automatically inferred)
 - **failFast**: Whether to fail immediately on first error (default: true)
@@ -440,6 +532,22 @@ Adds **type-safe** asynchronous debugging/logging to the pipeline with stage inf
 
 Adds a label to the current pipeline step for better error reporting and debugging.
 
+### **HandlerResult Type Guards**
+
+#### `isHandlerError<R>(result: HandlerResult<R>): result is Error`
+
+Type guard function to check if a `HandlerResult` is an `Error`.
+- **Returns**: `true` if the result is an `Error`, `false` otherwise
+- **Type narrowing**: TypeScript will narrow the type to `Error` in the `if` block
+- **Example**: `if (isHandlerError(result)) { /* result is Error */ }`
+
+#### `isHandlerSuccess<R>(result: HandlerResult<R>): result is Input<R>`
+
+Type guard function to check if a `HandlerResult` is a successful value.
+- **Returns**: `true` if the result is a successful value (not an `Error`), `false` otherwise
+- **Type narrowing**: TypeScript will narrow the type to `Input<R>` in the `if` block
+- **Example**: `if (isHandlerSuccess(result)) { /* result is Input<R> */ }`
+
 ## 🚀 Why Unified Type-Safe Pipelines?
 
 - **🔒 Compile-time Safety**: Catch errors before runtime
@@ -454,6 +562,16 @@ Adds a label to the current pipeline step for better error reporting and debuggi
 - **🔍 Enhanced Debugging**: Built-in debugging with stage tracking and error details
 - **🏗️ Modular Architecture**: Clean separation of concerns with comprehensive testing
 - **🚀 Parallel Processing**: Execute multiple operations concurrently for maximum performance
+
+### Why keyed parallel?
+
+| Aspect | Tuple `Promise.all` | **Keyed parallel** |
+|---|---|---|
+| Addressing | by index | **by meaning (key)** |
+| Order dependency | required | **none** |
+| `as const` | often required | **not needed** |
+| Type inference | fragile across mixes | **stable across sync/async** |
+| Readability | order implies meaning | **keys express responsibility** |
 
 ## Development
 
