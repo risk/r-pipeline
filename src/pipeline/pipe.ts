@@ -15,6 +15,8 @@ import {
   Input,
   makePipeError,
   makePipeSuccess,
+  ParallelFuncResultsMap,
+  ParallelPipeResultsMap,
   PipeError,
   PipeExecutable,
   PipeInterface,
@@ -57,6 +59,10 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     return new Pipe<O, R, I, RootI>(this, handler, recoverHandler)
   }
 
+  /**
+   * @deprecated Use `keyedParallelJoint` instead. This method will be removed in a future version.
+   * Executes multiple handlers in parallel with array-based results.
+   */
   parallelJoint<
     T extends readonly HandlerFunction<O, unknown>[],
     R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>,
@@ -70,6 +76,30 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
         }
       }
       return results as HandlerResult<R>
+    }, recoverHandler)
+  }
+
+  keyedParallelJoint<T extends Record<keyof T, HandlerFunction<O, Awaited<ReturnType<T[keyof T]>>>>>(
+    handlers: T,
+    failFast: boolean = true,
+    recoverHandler?: RecoverFunction<I, O>
+  ): PipeInterface<O, ParallelFuncResultsMap<O, T>, RootI> {
+    return this.joint(async (input: Input<O>): Promise<HandlerResult<ParallelFuncResultsMap<O, T>>> => {
+      const keys = Object.keys(handlers) as (keyof T)[]
+      const results = {} as ParallelFuncResultsMap<O, T>
+      await Promise.all(
+        keys.map(async key => {
+          const result = await handlers[key](input)
+          results[key] = result
+        })
+      )
+      if (failFast) {
+        const error = Object.values(results).find(result => result instanceof Error)
+        if (error !== undefined) {
+          return error
+        }
+      }
+      return results
     }, recoverHandler)
   }
 
@@ -88,6 +118,10 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     )
   }
 
+  /**
+   * @deprecated Use `keyedParallelBranch` instead. This method will be removed in a future version.
+   * Executes multiple pipelines in parallel with array-based results.
+   */
   parallelBranch<
     T extends readonly PipeInterface<O, unknown, O>[],
     R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]['streamAsync']>> }>,
@@ -101,6 +135,29 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
         }
       }
       return results as HandlerResult<R>
+    }, recoverHandler)
+  }
+
+  keyedParallelBranch<T extends Record<keyof T, PipeInterface<O, Awaited<ReturnType<T[keyof T]['streamAsync']>>, O>>>(
+    pipes: T,
+    failFast: boolean = true,
+    recoverHandler?: RecoverFunction<I, O>
+  ): PipeInterface<O, ParallelPipeResultsMap<O, T>, RootI> {
+    return this.joint(async (input: Input<O>): Promise<HandlerResult<ParallelPipeResultsMap<O, T>>> => {
+      const keys = Object.keys(pipes) as (keyof T)[]
+      const results = {} as ParallelPipeResultsMap<O, T>
+      await Promise.all(
+        keys.map(async key => {
+          results[key] = await pipes[key].streamAsync(input)
+        })
+      )
+      if (failFast) {
+        const error = Object.values(results).find(result => result instanceof Error)
+        if (error !== undefined) {
+          return error
+        }
+      }
+      return results
     }, recoverHandler)
   }
 

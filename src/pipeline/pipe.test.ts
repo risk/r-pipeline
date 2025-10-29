@@ -7,6 +7,7 @@
 import { MockInstance } from 'vitest'
 
 import { Pipe } from './pipe'
+import { isHandlerError, isHandlerSuccess } from './pipeTypes'
 
 describe('Pipeline', () => {
   describe('Pipe', () => {
@@ -345,6 +346,92 @@ describe('Pipeline', () => {
       })
     })
 
+    describe('Keyed parallel joint', () => {
+      it('executes multiple async handlers in parallel', async () => {
+        const pipe = Pipe.from((x: number) => x).keyedParallelJoint({
+          a: async x => x + 1,
+          b: async x => (x + 2).toString(),
+          c: async x => x + 3,
+        })
+        const result = await pipe.streamAsync(1)
+        if (!isHandlerError(result)) {
+          expect(result.a).toBe(2)
+          expect(result.b).toBe('3')
+          expect(result.c).toBe(4)
+        }
+        expect(result).toStrictEqual({ a: 2, b: '3', c: 4 })
+      })
+
+      it('executes multiple async handlers in parallel regardless of order', async () => {
+        const pipe = Pipe.from((x: number) => x).keyedParallelJoint({
+          c: async x => x + 3,
+          b: async x => (x + 2).toString(),
+          a: async x => x + 1,
+        })
+        const result = await pipe.streamAsync(1)
+        if (isHandlerSuccess(result)) {
+          expect(result.a).toBe(2)
+          expect(result.b).toBe('3')
+          expect(result.c).toBe(4)
+        }
+        expect(result).toStrictEqual({ a: 2, b: '3', c: 4 })
+      })
+
+      it('executes multiple sync and async handlers in parallel', async () => {
+        const pipe = Pipe.from((x: number) => x).keyedParallelJoint({
+          a: async x => x + 1,
+          b: x => (x + 2).toString(),
+          c: async x => x + 3,
+        })
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual({ a: 2, b: '3', c: 4 })
+      })
+
+      it('executes empty array', async () => {
+        const pipe = Pipe.from((x: number) => x).keyedParallelJoint({})
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual({})
+      })
+
+      it('stops early on failfast error', async () => {
+        const pipe = Pipe.from((x: number) => x)
+          .keyedParallelJoint({
+            a: async x => x + 1,
+            err: async () => new Error('error'),
+          })
+          .joint(() => 'should not run')
+        const result = await pipe.streamAsync(1)
+        expect(result).toBeInstanceOf(Error)
+        expect(result).toStrictEqual(new Error('error'))
+      })
+
+      it('continues on error when failfast is false', async () => {
+        const pipe = Pipe.from((x: number) => x).keyedParallelJoint(
+          {
+            a: async x => x + 1,
+            err: async () => new Error('error'),
+          },
+          false
+        )
+        const result = await pipe.streamAsync(1)
+        expect(result).toStrictEqual({ a: 2, err: new Error('error') })
+      })
+
+      it('runs recover handler when parallel fails', async () => {
+        const recover = vi.fn((e: Error) => e)
+        const pipe = Pipe.from((x: number) => x)
+          .keyedParallelJoint(
+            {
+              err: async () => new Error('fail'),
+            },
+            true
+          )
+          .repair(recover)
+        await pipe.streamAsync(1)
+        expect(recover).toHaveBeenCalledWith(new Error('fail'), 1)
+      })
+    })
+
     it('branch pipe', async () => {
       const f = async (x: string) => `${x}+`
       const branchPipe = Pipe.from(f).joint(f)
@@ -382,6 +469,70 @@ describe('Pipeline', () => {
         const pipe = Pipe.from((x: number) => x).parallelBranch([sub1, sub2] as const, false)
         const result = await pipe.streamAsync(3)
         expect(result).toStrictEqual([4, new Error('error')])
+      })
+    })
+
+    describe('Keyed parallel branch', () => {
+      it('executes multiple pipes in parallel', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (x: number) => x * 2)
+        const sub3 = Pipe.from(async (x: number) => x.toString())
+        const pipe = Pipe.from((x: number) => x).keyedParallelBranch({
+          s1: sub1,
+          s2: sub2,
+          s3: sub3,
+        })
+        const result = await pipe.streamAsync(3)
+        expect(result).toStrictEqual({ s1: 4, s2: 6, s3: '3' })
+        if (!isHandlerError(result)) {
+          expect(result.s1).toBe(4)
+          expect(result.s2).toBe(6)
+          expect(result.s3).toBe('3')
+        }
+      })
+
+      it('executes multiple pipes in parallel regardless of order', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (x: number) => x * 2)
+        const sub3 = Pipe.from(async (x: number) => x.toString())
+        const pipe = Pipe.from((x: number) => x).keyedParallelBranch({
+          s3: sub3,
+          s1: sub1,
+          s2: sub2,
+        })
+        const result = await pipe.streamAsync(3)
+        expect(result).toStrictEqual({ s1: 4, s2: 6, s3: '3' })
+        if (isHandlerSuccess(result)) {
+          expect(result.s1).toBe(4)
+          expect(result.s2).toBe(6)
+          expect(result.s3).toBe('3')
+        }
+      })
+
+      it('stops early on failfast', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (_x: number) => new Error('error'))
+        const pipe = Pipe.from((x: number) => x).keyedParallelBranch({
+          s1: sub1,
+          sError: sub2,
+        })
+        const result = await pipe.streamAsync(3)
+        expect(result).toBeInstanceOf(Error)
+        expect(result).toStrictEqual(new Error('error'))
+      })
+
+      it('continues when failfast = false', async () => {
+        const sub1 = Pipe.from(async (x: number) => x + 1)
+        const sub2 = Pipe.from(async (_x: number) => new Error('error'))
+        const pipe = Pipe.from((x: number) => x).keyedParallelBranch(
+          {
+            s1: sub1,
+            sError: sub2,
+          },
+          false
+        )
+        const result = await pipe.streamAsync(3)
+        expect(result).toStrictEqual({ s1: 4, sError: new Error('error') })
       })
     })
 
