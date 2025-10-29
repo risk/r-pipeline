@@ -59,6 +59,10 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     return new Pipe<O, R, I, RootI>(this, handler, recoverHandler)
   }
 
+  /**
+   * @deprecated Use `keyedParallelJoint` instead. This method will be removed in a future version.
+   * Executes multiple handlers in parallel with array-based results.
+   */
   parallelJoint<
     T extends readonly HandlerFunction<O, unknown>[],
     R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>,
@@ -114,6 +118,10 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     )
   }
 
+  /**
+   * @deprecated Use `keyedParallelBranch` instead. This method will be removed in a future version.
+   * Executes multiple pipelines in parallel with array-based results.
+   */
   parallelBranch<
     T extends readonly PipeInterface<O, unknown, O>[],
     R = Readonly<{ [K in keyof T]: Awaited<ReturnType<T[K]['streamAsync']>> }>,
