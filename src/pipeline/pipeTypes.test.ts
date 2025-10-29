@@ -4,9 +4,31 @@
  * https://github.com/risk/r-pipeline
  */
 
-import { makePipeError, makePipeSuccess } from './pipeTypes'
+import { HandlerResult, isHandlerError, isHandlerSuccess, makePipeError, makePipeSuccess } from './pipeTypes'
 
 describe('pipeTypes helper function', () => {
+  describe('isHandlerError', () => {
+    it('isHandlerError return true', () => {
+      const result: HandlerResult<string> = new Error('test')
+      expect(isHandlerError(result)).toBeTruthy()
+    })
+    it('isHandlerError return false', () => {
+      const result: HandlerResult<string> = 'test'
+      expect(isHandlerError(result)).toBeFalsy()
+    })
+  })
+
+  describe('isHandlerSuccess', () => {
+    it('isHandlerError return true', () => {
+      const result: HandlerResult<string> = new Error('test')
+      expect(isHandlerSuccess(result)).toBeFalsy()
+    })
+    it('isHandlerError return false', () => {
+      const result: HandlerResult<string> = 'test'
+      expect(isHandlerSuccess(result)).toBeTruthy()
+    })
+  })
+
   it('makePipeSuccess', () => {
     const success = makePipeSuccess('success data')
     expect(success.kind).toBe('success')

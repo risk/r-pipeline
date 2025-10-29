@@ -15,6 +15,8 @@ import {
   Input,
   makePipeError,
   makePipeSuccess,
+  ParallelFuncResultsMap,
+  ParallelPipeResultsMap,
   PipeError,
   PipeExecutable,
   PipeInterface,
@@ -73,6 +75,30 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     }, recoverHandler)
   }
 
+  keyedParallelJoint<T extends Record<keyof T, HandlerFunction<O, Awaited<ReturnType<T[keyof T]>>>>>(
+    handlers: T,
+    failFast: boolean = true,
+    recoverHandler?: RecoverFunction<I, O>
+  ): PipeInterface<O, ParallelFuncResultsMap<O, T>, RootI> {
+    return this.joint(async (input: Input<O>): Promise<HandlerResult<ParallelFuncResultsMap<O, T>>> => {
+      const keys = Object.keys(handlers) as (keyof T)[]
+      const results = {} as ParallelFuncResultsMap<O, T>
+      await Promise.all(
+        keys.map(async key => {
+          const result = await handlers[key](input)
+          results[key] = result
+        })
+      )
+      if (failFast) {
+        const error = Object.values(results).find(result => result instanceof Error)
+        if (error !== undefined) {
+          return error
+        }
+      }
+      return results
+    }, recoverHandler)
+  }
+
   repair(recoverHandler: RecoverFunction<I, O>): PipeInterface<O, O, RootI> {
     return this.joint(x => x, recoverHandler)
   }
@@ -101,6 +127,29 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
         }
       }
       return results as HandlerResult<R>
+    }, recoverHandler)
+  }
+
+  keyedParallelBranch<T extends Record<keyof T, PipeInterface<O, Awaited<ReturnType<T[keyof T]['streamAsync']>>, O>>>(
+    pipes: T,
+    failFast: boolean = true,
+    recoverHandler?: RecoverFunction<I, O>
+  ): PipeInterface<O, ParallelPipeResultsMap<O, T>, RootI> {
+    return this.joint(async (input: Input<O>): Promise<HandlerResult<ParallelPipeResultsMap<O, T>>> => {
+      const keys = Object.keys(pipes) as (keyof T)[]
+      const results = {} as ParallelPipeResultsMap<O, T>
+      await Promise.all(
+        keys.map(async key => {
+          results[key] = await pipes[key].streamAsync(input)
+        })
+      )
+      if (failFast) {
+        const error = Object.values(results).find(result => result instanceof Error)
+        if (error !== undefined) {
+          return error
+        }
+      }
+      return results
     }, recoverHandler)
   }
 
