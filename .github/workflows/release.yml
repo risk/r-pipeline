@@ -55,7 +55,9 @@ jobs:
           # fetch current release notes
           gh release view "$TAG_NAME" --json body -q .body > release_body.txt
           {
-            echo "## Installation\n";
+            echo "";
+            echo "## Installation";
+            echo "";
             echo '```bash';
             echo "npm install r-pipeline@${TAG_NAME}";
             echo '```';
