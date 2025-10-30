@@ -40,22 +40,24 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          body: |
-            ## Changes in this release
-            
-            - Enhanced debugging with stage information
-            - Improved API with better parameter names
-            - Advanced error handling with detailed information
-            - Modular architecture with comprehensive testing
-            - Type system improvements with PipeResult
-            
-            ## Installation
-            
-            ```bash
-            npm install r-pipeline@${{ github.ref_name }}
-            ```
           draft: false
           prerelease: false
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append Installation section to release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -e
+          # fetch current release notes
+          gh release view "$TAG_NAME" --json body -q .body > release_body.txt
+          {
+            echo "\n## Installation\n";
+            echo '```bash';
+            echo "npm install r-pipeline@${TAG_NAME}";
+            echo '```';
+          } >> release_body.txt
+          gh release edit "$TAG_NAME" --notes-file release_body.txt
