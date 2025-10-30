@@ -129,3 +129,8 @@ export interface PipeExecutable {
   unitStream(): PipeExecutable | null
   unitStreamAsync(): Promise<PipeExecutable | null>
 }
+
+export interface PipeStreamErrorPropagator {
+  getError(): Error | PipeStreamErrorPropagator | null
+  getStreamError(): Error | null
+}
