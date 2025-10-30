@@ -21,10 +21,11 @@ import {
   PipeExecutable,
   PipeInterface,
   PipeResult,
+  PipeStreamErrorPropagator,
   RecoverFunction,
 } from './pipeTypes'
 
-export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeExecutable {
+export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeExecutable, PipeStreamErrorPropagator {
   private start: Pipe<RootI, unknown, never, RootI> | null = null
   private entryInput: Input<I> | null = null
 
@@ -229,17 +230,27 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     return this.result
   }
 
-  private getStreamError(): Error | null {
+  getError(): Error | PipeStreamErrorPropagator | null {
     const result = this.getResult()
     if (result.kind === 'error') {
       return result.value.error
     }
-    /* c8 ignore next 4 */
-    // なんのパイプも処理しないで null に落ちるケースはありえないので到達不可
-    if (this.parent === null) {
-      return null
+    return this.parent ?? null
+  }
+
+  getStreamError(): Error | null {
+    let current: PipeStreamErrorPropagator | null = this
+    while (current !== null) {
+      const result = current.getError()
+      if (result instanceof Error) {
+        return result
+      }
+      if (result === null) {
+        return null
+      }
+      current = result
     }
-    return this.parent.getStreamError()
+    return null
   }
 
   unitStream(): PipeExecutable | null {
