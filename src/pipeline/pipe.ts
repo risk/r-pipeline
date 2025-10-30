@@ -392,4 +392,25 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     await this.start.doStreamAsync(input)
     return this.getStreamResult()
   }
+
+  private doGetHistory(index: number = 0): Record<number, { result: PipeResult<any, any>; stage: string }> {
+    let results = {} as Record<number, { result: PipeResult<any, any>; stage: string }>
+    if (this.parent !== null) {
+      results = this.parent.doGetHistory(index + 1)
+    }
+    const result = this.getResult()
+    if (result.kind === 'empty') {
+      return results
+    }
+    // console.log(results, result)
+    return {
+      ...results,
+      [index]: { result: this.getResult(), stage: this.stage },
+    }
+  }
+
+  getHistory(): Record<number, any> {
+    const history = this.doGetHistory()
+    return Object.entries(history)
+  }
 }

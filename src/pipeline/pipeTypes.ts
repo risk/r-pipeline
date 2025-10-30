@@ -123,6 +123,7 @@ export interface PipeInterface<I, O, RootI> {
   ): PipeInterface<O, O, RootI>
   stream(input: Input<RootI>): HandlerResult<O>
   streamAsync(input: Input<RootI>): Promise<HandlerResult<O>>
+  getHistory(): Record<number, any>
 }
 
 export interface PipeExecutable {

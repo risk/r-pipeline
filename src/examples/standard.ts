@@ -68,3 +68,12 @@ console.log(x2Pipe.stream(2))
 const x3Pipe = basePipe.branch(subPipeX3)
 console.log(x3Pipe.stream(2))
 // output -> { x3: 6, x6: 12, x9: 18 }
+
+// Pipes stream history
+const pipesHistory = Pipe.from((x: number) => x)
+  .joint(x => x + 1)
+  .joint(x => x.toString())
+  .joint(x => x + '+')
+console.log(pipesHistory.stream(1))
+const history = pipesHistory.getHistory()
+console.dir(history, { depth: null })
