@@ -19,7 +19,9 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "prepublishOnly": "npm run build && npm test",
-    "release": "npm version && git push --follow-tags"
+    "version:patch": "npm version patch --no-git-tag-version && git add package.json package-lock.json && git commit -S -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag -s v$(node -p \"require('./package.json').version\") -m \"Release v$(node -p \"require('./package.json').version\")\" && git push --follow-tags",
+    "version:minor": "npm version minor --no-git-tag-version && git add package.json package-lock.json && git commit -S -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag -s v$(node -p \"require('./package.json').version\") -m \"Release v$(node -p \"require('./package.json').version\")\" && git push --follow-tags",
+    "version:major": "npm version major --no-git-tag-version && git add package.json package-lock.json && git commit -S -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag -s v$(node -p \"require('./package.json').version\") -m \"Release v$(node -p \"require('./package.json').version\")\" && git push --follow-tags"
   },
   "keywords": [
     "typescript",
