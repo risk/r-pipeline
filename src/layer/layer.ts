@@ -7,7 +7,7 @@
 import { HandlerResult, Input } from '../pipeline/pipeTypes'
 import { isThenable } from '../utils/isThenable'
 
-import { LayerInterface } from './layerTypes'
+import { LayerEntry, LayerExit, LayerInterface } from './layerTypes'
 
 function layerThenableError(tag: string) {
   return new Error(`[${tag}]Cannot use thenable function. Please use stackAsyncLayer()`)
@@ -103,16 +103,16 @@ export function stackAsyncLayer<I, O, C>(layer: LayerInterface<I, O, C> | LayerI
 }
 
 export function makeLayer<I, O, C>(
-  entry: (input: Input<I>, context?: C) => HandlerResult<I>,
-  exit: (output: HandlerResult<O>, context?: C) => HandlerResult<O>,
+  entry: LayerEntry<I, C>,
+  exit: LayerExit<O, C>,
   context?: C
 ): LayerInterface<I, O, C> {
   return { entry, exit, context }
 }
 
 export function makeAsyncLayer<I, O, C>(
-  entry: (input: Input<I>, context?: C) => HandlerResult<I> | Promise<HandlerResult<I>>,
-  exit: (output: HandlerResult<O>, context?: C) => HandlerResult<O> | Promise<HandlerResult<O>>,
+  entry: LayerEntry<I, C>,
+  exit: LayerExit<O, C>,
   context?: C
 ): LayerInterface<I, O, C> {
   return { entry, exit, context }
