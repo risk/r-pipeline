@@ -7,97 +7,181 @@
 import { HandlerResult, Input } from '../pipeline/pipeTypes'
 import { isThenable } from '../utils/isThenable'
 
-import { LayerEntry, LayerExit, LayerInterface } from './layerTypes'
+import {
+  EntryJudgeResult,
+  entryJudgeResultContinue,
+  ExitJudgeResult,
+  exitJudgeResultContinue,
+  LayerConditions,
+  LayerEntry,
+  LayerExit,
+} from './layerTypes'
+
+type LayerExecutableEntry<I> = (input: Input<I>) => HandlerResult<I> | Promise<HandlerResult<I>>
+type LayerExecutableExit<O> = (output: HandlerResult<O>) => HandlerResult<O> | Promise<HandlerResult<O>>
+
+type LayerExecutableEntryJudge<I, O> = (input: HandlerResult<I>) => EntryJudgeResult<O> | Promise<EntryJudgeResult<O>>
+type LayerExecutableExitJudge<I, O> = (output: HandlerResult<O>) => ExitJudgeResult<I> | Promise<ExitJudgeResult<I>>
+
+interface LayerExecuitableConditions<I, O> {
+  onEntryJudge: LayerExecutableEntryJudge<I, O>
+  onExitJudge: LayerExecutableExitJudge<I, O>
+}
+
+interface LayerExecutableInterface<I, O> {
+  name: string
+  entry: LayerExecutableEntry<I>
+  exit: LayerExecutableExit<O>
+  conditions: LayerExecuitableConditions<I, O>
+}
 
 function layerThenableError(tag: string) {
   return new Error(`[${tag}]Cannot use thenable function. Please use stackAsyncLayer()`)
 }
 
-const callWithContext = <C, I extends R, R = I>(context: C | undefined, fn: (input: I, context?: C) => R) => {
-  return (input: I): R => {
-    return fn(input, context)
-  }
-}
-
-export function stackLayer<I, O, C>(
-  layer: LayerInterface<I, O, C> | LayerInterface<I, O, C>[],
-  name: string = 'layer'
-) {
-  const entris = Array.isArray(layer)
-    ? layer.map(l => callWithContext(l.context, l.entry))
-    : [callWithContext(layer.context, layer.entry)]
-  const exits = Array.isArray(layer)
-    ? layer.map(l => callWithContext(l.context, l.exit)).reverse()
-    : [callWithContext(layer.context, layer.exit)]
+export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerExecutableInterface<I, O>[]) {
+  const entryLayers: LayerExecutableInterface<I, O>[] = Array.isArray(layer) ? [...layer] : [layer]
+  const exitLayers: LayerExecutableInterface<I, O>[] = []
 
   return (handler: (input: Input<I>) => HandlerResult<O>) => {
     return (input: Input<I>): HandlerResult<O> => {
       let layeredInput: HandlerResult<I> = input
-      for (const [index, entry] of Object.entries(entris)) {
-        const entryResult: HandlerResult<I> | Promise<HandlerResult<I>> = entry(layeredInput)
-        if (isThenable(entryResult)) {
-          return layerThenableError(`${name}[${index}]:entry`)
-        }
-        // entryでエラーした場合は、先に進まない
-        if (entryResult instanceof Error) {
-          return entryResult
-        }
-        layeredInput = entryResult
-      }
+      const output: { value: HandlerResult<O> | null } = { value: null }
+      let retry = false
+      do {
+        output.value = null
+        retry = false
 
-      const output = handler(layeredInput)
-      if (isThenable(output)) {
-        // Handerは、型でPromiseを許可しないので到達不可
-        return layerThenableError(`${name}:handler`)
-      }
+        while (entryLayers.length > 0) {
+          const currentlayer = entryLayers.shift()
+          if (currentlayer === undefined) {
+            return new Error(`[${exitLayers.length + 1}]Entry layer not found(unreached code)`)
+          }
+          exitLayers.push(currentlayer)
 
-      // Outputはエラーも処理可能（repair代替の実現）
-      let layeredOutput: HandlerResult<O> = output
-      for (const [index, exit] of Object.entries(exits)) {
-        const exitResult: HandlerResult<O> | Promise<HandlerResult<O>> = exit(layeredOutput)
-        if (isThenable(exitResult)) {
-          return layerThenableError(`${name}[${exits.length - 1 - parseInt(index, 10)}]:entry`)
+          const entryResult = currentlayer.entry(layeredInput)
+          if (isThenable(entryResult)) {
+            return layerThenableError(`${currentlayer.name}(${exitLayers.length}):entry`)
+          }
+
+          // entryでエラーした場合は、先に進まない
+          if (entryResult instanceof Error) {
+            return entryResult
+          }
+
+          const judgeResult = currentlayer.conditions.onEntryJudge(entryResult)
+          if (isThenable(judgeResult)) {
+            return layerThenableError(`[${currentlayer.name}:${exitLayers.length}]:onEntryJudge`)
+          }
+          if (judgeResult.kind === 'skip') {
+            output.value = judgeResult.value
+            break
+          }
+
+          layeredInput = entryResult
         }
-        layeredOutput = exitResult
-      }
 
-      return layeredOutput
+        const handlerResult = output.value === null ? handler(layeredInput) : output.value
+        if (isThenable(output.value)) {
+          return layerThenableError('${currentlayer.name}(${exitLayers.length}):onEntryJudge')
+        }
+        output.value = handlerResult
+
+        // Outputはエラーも処理可能（repair代替の実現）
+        while (exitLayers.length > 0) {
+          const currentlayer = exitLayers.pop()
+          if (currentlayer === undefined) {
+            return new Error(`[${exitLayers.length + 1}]Exit layer not found(unreached code)`)
+          }
+          entryLayers.push(currentlayer)
+
+          const exitResult = currentlayer.exit(output.value)
+          if (isThenable(exitResult)) {
+            return layerThenableError(`${currentlayer.name}(${exitLayers.length}):exit`)
+          }
+
+          const judgeResult = currentlayer.conditions.onExitJudge(exitResult)
+          if (isThenable(judgeResult)) {
+            return layerThenableError(`${currentlayer.name}(${exitLayers.length}):onExitJudge`)
+          }
+          if (judgeResult.kind === 'retry') {
+            retry = true
+            break
+          } else if (judgeResult.kind === 'override') {
+            output.value = judgeResult.error
+          } else {
+            output.value = exitResult
+          }
+        }
+      } while (retry)
+
+      // 最終結果(値 or Error)
+      return output.value
     }
   }
 }
 
-export function stackAsyncLayer<I, O, C>(layer: LayerInterface<I, O, C> | LayerInterface<I, O, C>[]) {
-  const entris = Array.isArray(layer)
-    ? layer.map(l => callWithContext(l.context, l.entry))
-    : [callWithContext(layer.context, layer.entry)]
-  const exits = Array.isArray(layer)
-    ? layer.map(l => callWithContext(l.context, l.exit)).reverse()
-    : [callWithContext(layer.context, layer.exit)]
+export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerExecutableInterface<I, O>[]) {
+  const entryLayers: LayerExecutableInterface<I, O>[] = Array.isArray(layer) ? layer : [layer]
+  const exitLayers: LayerExecutableInterface<I, O>[] = []
 
   return (handler: (input: Input<I>) => HandlerResult<O> | Promise<HandlerResult<O>>) => {
     return async (input: Input<I>): Promise<HandlerResult<O>> => {
       let layeredInput: HandlerResult<I> = input
-      for (const entry of entris) {
-        const entryResult: HandlerResult<I> = await Promise.resolve(entry(layeredInput))
+      const output: { value: HandlerResult<O> | null } = { value: null }
+      let retry = false
+      do {
+        while (entryLayers.length > 0) {
+          const currentlayer = entryLayers.shift()
+          if (currentlayer === undefined) {
+            return new Error(`[${exitLayers.length + 1}]Entry layer not found(unreached code)`)
+          }
+          exitLayers.push(currentlayer)
 
-        // entryでエラーした場合は、先に進まない
-        if (entryResult instanceof Error) {
-          return entryResult
+          const entryResult: HandlerResult<I> = await Promise.resolve(currentlayer.entry(layeredInput))
+
+          // entryでエラーした場合は、先に進まない
+          if (entryResult instanceof Error) {
+            return entryResult
+          }
+
+          const judgeResult: EntryJudgeResult<O> = await Promise.resolve(
+            currentlayer.conditions.onEntryJudge(entryResult)
+          )
+          if (judgeResult.kind === 'skip') {
+            output.value = judgeResult.value
+            break
+          }
+
+          layeredInput = entryResult
         }
-        layeredInput = entryResult
-      }
 
-      const output = await Promise.resolve(handler(layeredInput))
+        output.value = await Promise.resolve(handler(layeredInput))
 
-      // Outputはエラーも処理可能（repair代替の実現）
-      let layeredOutput: HandlerResult<O> = output
-      for (const exit of exits) {
-        const exitResult: HandlerResult<O> = await exit(layeredOutput)
-        layeredOutput = exitResult
-      }
+        // Outputはエラーも処理可能（repair代替の実現）
+        while (exitLayers.length > 0) {
+          const currentlayer = exitLayers.pop()
+          if (currentlayer === undefined) {
+            return new Error(`[${exitLayers.length + 1}]exit layer not found(unreached code)`)
+          }
+          entryLayers.push(currentlayer)
+
+          const exitResult: HandlerResult<O> = await Promise.resolve(currentlayer.exit(output.value))
+
+          const judgeResult: ExitJudgeResult<I> = await Promise.resolve(currentlayer.conditions.onExitJudge(exitResult))
+          if (judgeResult.kind === 'retry') {
+            retry = true
+            break
+          } else if (judgeResult.kind === 'override') {
+            output.value = judgeResult.error
+          } else {
+            output.value = exitResult
+          }
+        }
+      } while (retry)
 
       // 最終結果(値 or Error)
-      return layeredOutput
+      return output.value
     }
   }
 }
@@ -105,15 +189,99 @@ export function stackAsyncLayer<I, O, C>(layer: LayerInterface<I, O, C> | LayerI
 export function makeLayer<I, O, C>(
   entry: LayerEntry<I, C>,
   exit: LayerExit<O, C>,
-  context?: C
-): LayerInterface<I, O, C> {
-  return { entry, exit, context }
+  context?: C,
+  name: string = 'layer',
+  conditions?: LayerConditions<I, O, C>
+): LayerExecutableInterface<I, O> {
+  const ref: { current: Input<I> | null } = { current: null }
+  return {
+    name,
+    entry: (input: Input<I>) => {
+      ref.current = ref.current === null ? input : ref.current
+      return entry(ref.current, context)
+    },
+    exit: (output: HandlerResult<O>) => {
+      return exit(output, context)
+    },
+    conditions: {
+      onEntryJudge: (input: HandlerResult<I>) => {
+        return conditions?.onEntryJudge !== undefined
+          ? conditions.onEntryJudge(input, context)
+          : entryJudgeResultContinue<O>()
+      },
+      onExitJudge: (output: HandlerResult<O>) => {
+        if (ref.current === null) {
+          // entryが呼ばれずにこの関数だけ呼び出すことはないため、到達不可
+          // 念の為、エラーを上書きして情報を伝える
+          return {
+            kind: 'override',
+            error: new Error(`[${name}]Layer exit call only: ${output instanceof Error ? output.message : ''}`),
+          }
+        }
+        const result =
+          conditions?.onExitJudge !== undefined
+            ? conditions.onExitJudge(output, ref.current, context)
+            : exitJudgeResultContinue<I>()
+        if (isThenable(result)) {
+          return {
+            kind: 'override',
+            error: layerThenableError(`[${name}]:onExitJudge`),
+          }
+        }
+        if (result.kind === 'retry') {
+          ref.current = result.value
+        } else {
+          ref.current = null
+        }
+        return result
+      },
+    },
+  }
 }
 
 export function makeAsyncLayer<I, O, C>(
   entry: LayerEntry<I, C>,
   exit: LayerExit<O, C>,
-  context?: C
-): LayerInterface<I, O, C> {
-  return { entry, exit, context }
+  context?: C,
+  name: string = 'layer',
+  conditions?: LayerConditions<I, O, C>
+): LayerExecutableInterface<I, O> {
+  const ref: { current: Input<I> | null } = { current: null }
+  return {
+    name,
+    entry: (input: Input<I>) => {
+      ref.current = ref.current === null ? input : ref.current
+      return Promise.resolve(entry(ref.current, context))
+    },
+    exit: (output: HandlerResult<O>) => {
+      return Promise.resolve(exit(output, context))
+    },
+    conditions: {
+      onEntryJudge: (input: HandlerResult<I>) => {
+        return conditions?.onEntryJudge !== undefined
+          ? Promise.resolve(conditions.onEntryJudge(input, context))
+          : entryJudgeResultContinue<O>()
+      },
+      onExitJudge: async (output: HandlerResult<O>) => {
+        if (ref.current === null) {
+          // entryが呼ばれずにこの関数だけ呼び出すことはないため、到達不可
+          // 念の為、エラーを上書きして情報を伝える
+          return {
+            kind: 'override',
+            error: new Error(`[${name}]Layer exit call only: ${output instanceof Error ? output.message : ''}`),
+          }
+        }
+        const result =
+          conditions?.onExitJudge !== undefined
+            ? await Promise.resolve(conditions.onExitJudge(output, ref.current, context))
+            : exitJudgeResultContinue<I>()
+        if (result.kind === 'retry') {
+          ref.current = result.value
+        } else {
+          ref.current = null
+        }
+        return result
+      },
+    },
+  }
 }

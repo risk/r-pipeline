@@ -251,7 +251,7 @@ describe('layer', () => {
       expect(result).toBeInstanceOf(Error)
       console.log(result)
       if (result instanceof Error) {
-        expect(result.message).toBe('[layer[1]:entry]Cannot use thenable function. Please use stackAsyncLayer()')
+        expect(result.message).toBe('[layer(2):entry]Cannot use thenable function. Please use stackAsyncLayer()')
       }
 
       expect(mockLowEntry).toHaveBeenCalledWith(1, undefined)
@@ -288,7 +288,7 @@ describe('layer', () => {
       expect(mockLowExit).toHaveBeenCalledWith(new Error('error'), undefined)
     })
 
-    it('Low exit return thenable error', () => {
+    it('High entry return thenable error(use layerStack)', () => {
       const mockLowEntry = vi.fn((input: Input<number>): HandlerResult<number> => input)
       const mockLowExit = vi.fn((output: HandlerResult<string>): HandlerResult<string> => output)
       const mockHighEntry = vi.fn((input: Input<number>): HandlerResult<number> => input)
@@ -303,15 +303,14 @@ describe('layer', () => {
 
       const result = handler(1)
       expect(result).toBeInstanceOf(Error)
-      console.log(result)
       if (result instanceof Error) {
-        expect(result.message).toBe('[layer[1]:entry]Cannot use thenable function. Please use stackAsyncLayer()')
+        expect(result.message).toBe('[layer(2):entry]Cannot use thenable function. Please use stackAsyncLayer()')
       }
 
       expect(mockLowEntry).toHaveBeenCalledWith(1, undefined)
       expect(mockHighEntry).toHaveBeenCalledWith(1, undefined)
-      expect(mockHandler).toHaveBeenCalledWith(1)
-      expect(mockHighExit).toHaveBeenCalledWith('1', undefined)
+      expect(mockHandler).not.toBeCalled()
+      expect(mockHighExit).not.toBeCalled()
       expect(mockLowExit).not.toBeCalled()
     })
 
