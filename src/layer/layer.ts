@@ -55,6 +55,7 @@ export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerEx
 
         while (entryLayers.length > 0) {
           const currentlayer = entryLayers.shift()
+          /* v8 ignore if -- @preserve */
           if (currentlayer === undefined) {
             // レイヤが登録されていない場合そもそもここに来れないので、到達不可
             return new Error(`[${exitLayers.length + 1}]Entry layer not found(unreached code)`)
@@ -89,6 +90,7 @@ export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerEx
         // Outputはエラーも処理可能（repair代替の実現）
         while (exitLayers.length > 0) {
           const currentlayer = exitLayers.pop()
+          /* v8 ignore if -- @preserve */
           if (currentlayer === undefined) {
             // レイヤが登録されていない場合そもそもここに来れないので到達不可
             return new Error(`[${exitLayers.length + 1}]Exit layer not found(unreached code)`)
@@ -138,6 +140,7 @@ export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | La
 
         while (entryLayers.length > 0) {
           const currentlayer = entryLayers.shift()
+          /* v8 ignore if -- @preserve */
           if (currentlayer === undefined) {
             // レイヤが登録されていない場合そもそもここに来れないので到達不可
             return new Error(`[${exitLayers.length + 1}]Entry layer not found(unreached code)`)
@@ -167,6 +170,7 @@ export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | La
         // Outputはエラーも処理可能（repair代替の実現）
         while (exitLayers.length > 0) {
           const currentlayer = exitLayers.pop()
+          /* v8 ignore if -- @preserve */
           if (currentlayer === undefined) {
             // レイヤが登録されていない場合そもそもここに来れないので到達不可
             return new Error(`[${exitLayers.length + 1}]exit layer not found(unreached code)`)
@@ -219,6 +223,7 @@ export function makeLayer<I, O, C>(
           : entryJudgeResultContinue<O>()
       },
       onExitJudge: (output: HandlerResult<O>) => {
+        /* v8 ignore if -- @preserve */
         if (ref.current === null) {
           // entryが呼ばれずにこの関数だけ呼び出すことはないため、到達不可
           // 念の為、エラーを上書きして情報を伝える
@@ -262,6 +267,7 @@ export function makeAsyncLayer<I, O, C>(
           : entryJudgeResultContinue<O>()
       },
       onExitJudge: (output: HandlerResult<O>) => {
+        /* v8 ignore if -- @preserve */
         if (ref.current === null) {
           // entryが呼ばれずにこの関数だけ呼び出すことはないため、到達不可
           // 念の為、エラーを上書きして情報を伝える
