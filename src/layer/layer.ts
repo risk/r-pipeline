@@ -33,6 +33,7 @@ interface LayerExecutableInterface<I, O> {
   entry: LayerExecutableEntry<I>
   exit: LayerExecutableExit<O>
   conditions: LayerExecuitableConditions<I, O>
+  cleanup: () => void
 }
 
 function layerThenableError(tag: string) {
@@ -55,6 +56,7 @@ export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerEx
         while (entryLayers.length > 0) {
           const currentlayer = entryLayers.shift()
           if (currentlayer === undefined) {
+            // レイヤが登録されていない場合そもそもここに来れないので、到達不可
             return new Error(`[${exitLayers.length + 1}]Entry layer not found(unreached code)`)
           }
           exitLayers.push(currentlayer)
@@ -82,34 +84,34 @@ export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerEx
         }
 
         const handlerResult = output.value === null ? handler(layeredInput) : output.value
-        if (isThenable(output.value)) {
-          return layerThenableError('${currentlayer.name}(${exitLayers.length}):onEntryJudge')
-        }
         output.value = handlerResult
 
         // Outputはエラーも処理可能（repair代替の実現）
         while (exitLayers.length > 0) {
           const currentlayer = exitLayers.pop()
           if (currentlayer === undefined) {
+            // レイヤが登録されていない場合そもそもここに来れないので到達不可
             return new Error(`[${exitLayers.length + 1}]Exit layer not found(unreached code)`)
           }
           entryLayers.push(currentlayer)
 
           const exitResult = currentlayer.exit(output.value)
           if (isThenable(exitResult)) {
-            return layerThenableError(`${currentlayer.name}(${exitLayers.length}):exit`)
+            return layerThenableError(`${currentlayer.name}(${exitLayers.length + 1}):exit`)
           }
 
           const judgeResult = currentlayer.conditions.onExitJudge(exitResult)
           if (isThenable(judgeResult)) {
-            return layerThenableError(`${currentlayer.name}(${exitLayers.length}):onExitJudge`)
+            return layerThenableError(`${currentlayer.name}(${exitLayers.length + 1}):onExitJudge`)
           }
           if (judgeResult.kind === 'retry') {
+            layeredInput = judgeResult.value
             retry = true
             break
           } else if (judgeResult.kind === 'override') {
             output.value = judgeResult.error
           } else {
+            currentlayer.cleanup()
             output.value = exitResult
           }
         }
@@ -131,9 +133,13 @@ export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | La
       const output: { value: HandlerResult<O> | null } = { value: null }
       let retry = false
       do {
+        output.value = null
+        retry = false
+
         while (entryLayers.length > 0) {
           const currentlayer = entryLayers.shift()
           if (currentlayer === undefined) {
+            // レイヤが登録されていない場合そもそもここに来れないので到達不可
             return new Error(`[${exitLayers.length + 1}]Entry layer not found(unreached code)`)
           }
           exitLayers.push(currentlayer)
@@ -156,12 +162,13 @@ export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | La
           layeredInput = entryResult
         }
 
-        output.value = await Promise.resolve(handler(layeredInput))
+        output.value = output.value === null ? await Promise.resolve(handler(layeredInput)) : output.value
 
         // Outputはエラーも処理可能（repair代替の実現）
         while (exitLayers.length > 0) {
           const currentlayer = exitLayers.pop()
           if (currentlayer === undefined) {
+            // レイヤが登録されていない場合そもそもここに来れないので到達不可
             return new Error(`[${exitLayers.length + 1}]exit layer not found(unreached code)`)
           }
           entryLayers.push(currentlayer)
@@ -170,11 +177,13 @@ export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | La
 
           const judgeResult: ExitJudgeResult<I> = await Promise.resolve(currentlayer.conditions.onExitJudge(exitResult))
           if (judgeResult.kind === 'retry') {
+            layeredInput = judgeResult.value
             retry = true
             break
           } else if (judgeResult.kind === 'override') {
             output.value = judgeResult.error
           } else {
+            currentlayer.cleanup()
             output.value = exitResult
           }
         }
@@ -197,7 +206,7 @@ export function makeLayer<I, O, C>(
   return {
     name,
     entry: (input: Input<I>) => {
-      ref.current = ref.current === null ? input : ref.current
+      ref.current = input
       return entry(ref.current, context)
     },
     exit: (output: HandlerResult<O>) => {
@@ -218,23 +227,13 @@ export function makeLayer<I, O, C>(
             error: new Error(`[${name}]Layer exit call only: ${output instanceof Error ? output.message : ''}`),
           }
         }
-        const result =
-          conditions?.onExitJudge !== undefined
-            ? conditions.onExitJudge(output, ref.current, context)
-            : exitJudgeResultContinue<I>()
-        if (isThenable(result)) {
-          return {
-            kind: 'override',
-            error: layerThenableError(`[${name}]:onExitJudge`),
-          }
-        }
-        if (result.kind === 'retry') {
-          ref.current = result.value
-        } else {
-          ref.current = null
-        }
-        return result
+        return conditions?.onExitJudge !== undefined
+          ? conditions.onExitJudge(output, ref.current, context)
+          : exitJudgeResultContinue<I>()
       },
+    },
+    cleanup: () => {
+      ref.current = null
     },
   }
 }
@@ -250,19 +249,19 @@ export function makeAsyncLayer<I, O, C>(
   return {
     name,
     entry: (input: Input<I>) => {
-      ref.current = ref.current === null ? input : ref.current
-      return Promise.resolve(entry(ref.current, context))
+      ref.current = input
+      return entry(input, context)
     },
     exit: (output: HandlerResult<O>) => {
-      return Promise.resolve(exit(output, context))
+      return exit(output, context)
     },
     conditions: {
       onEntryJudge: (input: HandlerResult<I>) => {
         return conditions?.onEntryJudge !== undefined
-          ? Promise.resolve(conditions.onEntryJudge(input, context))
+          ? conditions.onEntryJudge(input, context)
           : entryJudgeResultContinue<O>()
       },
-      onExitJudge: async (output: HandlerResult<O>) => {
+      onExitJudge: (output: HandlerResult<O>) => {
         if (ref.current === null) {
           // entryが呼ばれずにこの関数だけ呼び出すことはないため、到達不可
           // 念の為、エラーを上書きして情報を伝える
@@ -271,17 +270,13 @@ export function makeAsyncLayer<I, O, C>(
             error: new Error(`[${name}]Layer exit call only: ${output instanceof Error ? output.message : ''}`),
           }
         }
-        const result =
-          conditions?.onExitJudge !== undefined
-            ? await Promise.resolve(conditions.onExitJudge(output, ref.current, context))
-            : exitJudgeResultContinue<I>()
-        if (result.kind === 'retry') {
-          ref.current = result.value
-        } else {
-          ref.current = null
-        }
-        return result
+        return conditions?.onExitJudge !== undefined
+          ? conditions.onExitJudge(output, ref.current, context)
+          : exitJudgeResultContinue<I>()
       },
+    },
+    cleanup: () => {
+      ref.current = null
     },
   }
 }
