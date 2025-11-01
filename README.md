@@ -269,7 +269,7 @@ if (isHandlerError(results)) {
 
 ## 🏗️ Layer Architecture
 
-r-pipeline includes a powerful **Layer Architecture** that provides middleware-like functionality with entry/exit hooks and context support.
+r-pipeline includes a powerful **Layer Architecture** that provides middleware-like functionality with entry/exit hooks, context support, and **conditional control flow**.
 
 ### **Layer Concept**
 
@@ -278,6 +278,7 @@ Layers wrap handlers with **entry** and **exit** functions that execute before a
 - **Authentication & Authorization**: Validate inputs and outputs
 - **Data Transformation**: Pre/post processing
 - **Error Handling**: Custom error recovery and logging
+- **Conditional Control**: Skip handlers, retry operations, or override results based on conditions
 
 ### **Basic Layer Usage**
 
@@ -294,7 +295,8 @@ const loggingLayer = makeLayer(
     console.log(`[${context?.name}] Exit:`, output);
     return `processed: ${output}`; // Transform output
   },
-  { name: 'Logger' } // Context
+  { name: 'Logger' }, // Context
+  'loggingLayer'      // Name (optional)
 );
 
 // Use with Pipe
@@ -370,6 +372,99 @@ const result = await pipe.streamAsync(5);
 // Console: Async entry: 5
 // Console: Async exit: 6
 // Result: "async: 6"
+```
+
+### **Conditional Layers**
+
+Layers support conditional control flow through **entry judge** and **exit judge** functions that can:
+- **Skip** the handler and return a value directly
+- **Retry** the operation with a new input value
+- **Override** the result with an error
+
+#### **Entry Judge - Skip Handler**
+
+```typescript
+import { entryJudgeResultContinue } from 'r-pipeline';
+
+const conditionalLayer = makeLayer(
+  (input: number) => input + 1,
+  (output: string) => output,
+  undefined, // Context
+  'conditionalLayer',
+  {
+    onEntryJudge: (input: number) => {
+      if (input === 2) {
+        // Skip handler and return value directly
+        return { kind: 'skip', value: 'skipped' };
+      }
+      return entryJudgeResultContinue();
+    },
+    onExitJudge: undefined,
+  }
+);
+
+const pipe = Pipe.from(stackLayer(conditionalLayer)(x => x.toString()));
+const result = pipe.stream(1);
+// Result: "skipped" (handler not executed)
+```
+
+#### **Exit Judge - Retry Operation**
+
+```typescript
+import { exitJudgeResultContinue } from 'r-pipeline';
+
+let retryCount = 0;
+const retryLayer = makeLayer(
+  (input: number) => {
+    retryCount++;
+    return input + retryCount;
+  },
+  (output: string) => output,
+  undefined,
+  'retryLayer',
+  {
+    onEntryJudge: undefined,
+    onExitJudge: (output: string, input: number) => {
+      if (retryCount < 3) {
+        // Retry with new input value
+        return { kind: 'retry', value: 10 };
+      }
+      return exitJudgeResultContinue();
+    },
+  }
+);
+
+const pipe = Pipe.from(stackLayer(retryLayer)(x => x.toString()));
+const result = pipe.stream(1);
+// Result: "13" (10 + 3, after 2 retries)
+```
+
+#### **Exit Judge - Override Result**
+
+```typescript
+const overrideLayer = makeLayer(
+  (input: number) => input,
+  (output: string) => output,
+  undefined,
+  'overrideLayer',
+  {
+    onEntryJudge: undefined,
+    onExitJudge: (output: string) => {
+      if (output.includes('error')) {
+        // Override result with error
+        return {
+          kind: 'override',
+          error: new Error('Operation failed'),
+        };
+      }
+      return exitJudgeResultContinue();
+    },
+  }
+);
+
+const pipe = Pipe.from(stackLayer(overrideLayer)(x => x.toString()));
+const result = pipe.stream(5);
+// Result: "5"
 ```
 
 ### **Layer with Error Handling**
@@ -463,25 +558,33 @@ Executes multiple pipelines in parallel with **type-safe** array results.
 
 ### **Layer API**
 
-#### `makeLayer<I, O, C>(entry?: (input: Input<I>, context?: C) => HandlerResult<I>, exit?: (output: HandlerResult<O>, context?: C) => HandlerResult<O>, context?: C)`
+#### `makeLayer<I, O, C>(entry: LayerEntry<I, C>, exit: LayerExit<O, C>, context?: C, name?: string, conditions?: LayerConditions<I, O, C>)`
 
-Creates a **type-safe** synchronous layer with entry/exit hooks and context support.
+Creates a **type-safe** synchronous layer with entry/exit hooks, context support, and conditional control flow.
 - **I**: Input type (automatically inferred)
 - **O**: Output type (automatically inferred)
 - **C**: Context type (optional)
 - **entry**: Function executed before the main handler
 - **exit**: Function executed after the main handler
-- **context**: Shared context object passed to entry/exit functions
+- **context**: Shared context object passed to entry/exit functions (optional)
+- **name**: Layer name for error reporting (optional, default: 'layer')
+- **conditions**: Conditional control flow with entry/exit judges (optional)
+  - **onEntryJudge**: Determines whether to continue or skip the handler
+  - **onExitJudge**: Determines whether to continue, retry, or override the result
 
-#### `makeAsyncLayer<I, O, C>(entry?: (input: Input<I>, context?: C) => HandlerResult<I> | Promise<HandlerResult<I>>, exit?: (output: HandlerResult<O>, context?: C) => HandlerResult<O> | Promise<HandlerResult<O>>, context?: C)`
+#### `makeAsyncLayer<I, O, C>(entry: LayerEntry<I, C>, exit: LayerExit<O, C>, context?: C, name?: string, conditions?: LayerConditions<I, O, C>)`
 
-Creates a **type-safe** asynchronous layer with entry/exit hooks and context support.
+Creates a **type-safe** asynchronous layer with entry/exit hooks, context support, and conditional control flow.
 - **I**: Input type (automatically inferred)
 - **O**: Output type (automatically inferred)
 - **C**: Context type (optional)
 - **entry**: Async function executed before the main handler
 - **exit**: Async function executed after the main handler
-- **context**: Shared context object passed to entry/exit functions
+- **context**: Shared context object passed to entry/exit functions (optional)
+- **name**: Layer name for error reporting (optional, default: 'layer')
+- **conditions**: Conditional control flow with entry/exit judges (optional)
+  - **onEntryJudge**: Determines whether to continue or skip the handler
+  - **onExitJudge**: Determines whether to continue, retry, or override the result
 
 #### `stackLayer<I, O, C>(layer: LayerInterface<I, O, C> | LayerInterface<I, O, C>[], name?: string)`
 
@@ -495,6 +598,18 @@ Creates a **type-safe** synchronous layer stack that wraps a handler.
 Creates a **type-safe** asynchronous layer stack that wraps a handler.
 - **layer**: Single layer or array of layers to stack
 - **Returns**: Function that wraps an async handler with the layer stack
+
+### **Conditional Layer Helpers**
+
+#### `entryJudgeResultContinue<I>(): EntryJudgeResult<I>`
+
+Returns a **continue** result for entry judge, allowing the handler to execute normally.
+- **Returns**: `{ kind: 'continue' }`
+
+#### `exitJudgeResultContinue<I>(): ExitJudgeResult<I>`
+
+Returns a **continue** result for exit judge, allowing normal flow to continue.
+- **Returns**: `{ kind: 'continue' }`
 
 ### **Execution Methods**
 
