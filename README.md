@@ -7,6 +7,10 @@ A **Type-Safe** TypeScript utility library for creating and managing data proces
 
 r-pipeline is built around the idea that data should flow as types do — safely, predictably, and with responsibility. Now with **unified sync/async pipeline support** in a single, powerful API.
 
+> ⚠️ Not *that* R.  
+> r-pipeline is a TypeScript pipeline engine, not an R package.  
+> The “r” stands for **risk**, not **R language**
+
 ## 🎯 Key Features
 
 - 🔒 **Type-Safe Pipeline** — **Complete type safety** from input to output with automatic type inference
