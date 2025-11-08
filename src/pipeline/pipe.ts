@@ -45,6 +45,18 @@ export class Pipe<I, O, PI, RootI> implements PipeInterface<I, O, RootI>, PipeEx
     }
   }
 
+  /**
+   * Creates the entry point of a pipeline.
+   *
+   * The handler passed to `Pipe.from` receives the initial input value
+   * and produces the first output that will be passed to subsequent stages
+   * (e.g. `joint`, `branch`, `keyedParallelJoint`, etc).
+   *
+   * @typeParam sI The root input type of the whole pipeline (RootI).
+   * @typeParam sR The output type of the first handler.
+   * @param handler The first handler that receives the pipeline input.
+   * @returns A Pipe instance that represents the first stage of the pipeline.
+   */
   static from<sI, sR>(handler: HandlerFunction<sI, sR>): PipeInterface<sI, sR, sI> {
     const pipe = new Pipe<sI, sR, never, sI>(null, handler)
     pipe.start = pipe

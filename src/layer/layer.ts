@@ -40,6 +40,23 @@ function layerThenableError(tag: string) {
   return new Error(`[${tag}]Cannot use thenable function. Please use stackAsyncLayer()`)
 }
 
+/**
+ * Compose a synchronous handler with one or more layers.
+ *
+ * Each layer can:
+ * - run an entry hook before the handler (for validation, preprocessing, logging, etc.)
+ * - run an exit hook after the handler (for postprocessing, logging, etc.)
+ * - control the flow via conditional entry/exit (skip / retry / override) defined in LayerConditions.
+ *
+ * This variant is **synchronous-only**: if any entry/exit/judge handler returns a Promise,
+ * it will throw an Error. For async layers or async handlers, use `stackAsyncLayer` instead.
+ *
+ * @typeParam I - Input type of the handler.
+ * @typeParam O - Output type of the handler.
+ * @param layer - Single layer or an array of layers. Layers are applied in the order provided
+ *                on entry, and in reverse order on exit.
+ * @returns A higher-order function that takes a handler and returns a layered handler.
+ */
 export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerExecutableInterface<I, O>[]) {
   const entryLayers: LayerExecutableInterface<I, O>[] = Array.isArray(layer) ? [...layer] : [layer]
   const exitLayers: LayerExecutableInterface<I, O>[] = []
@@ -125,6 +142,23 @@ export function stackLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerEx
   }
 }
 
+/**
+ * Compose an asynchronous handler with one or more layers.
+ *
+ * Each layer can:
+ * - run an entry hook before the handler (for validation, preprocessing, logging, etc.)
+ * - run an exit hook after the handler (for postprocessing, logging, etc.)
+ * - control the flow via conditional entry/exit (skip / retry / override) defined in LayerConditions.
+ *
+ * This variant supports **async** entry/exit/judge/handler: any thenable is awaited internally.
+ * For purely synchronous composition, or to detect accidental async usage, use `stackLayer` instead.
+ *
+ * @typeParam I - Input type of the handler.
+ * @typeParam O - Output type of the handler.
+ * @param layer - Single layer or an array of layers. Layers are applied in the order provided
+ *                on entry, and in reverse order on exit.
+ * @returns A higher-order function that takes a handler and returns an async layered handler.
+ */
 export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | LayerExecutableInterface<I, O>[]) {
   const entryLayers: LayerExecutableInterface<I, O>[] = Array.isArray(layer) ? layer : [layer]
   const exitLayers: LayerExecutableInterface<I, O>[] = []
@@ -199,6 +233,28 @@ export function stackAsyncLayer<I, O>(layer: LayerExecutableInterface<I, O> | La
   }
 }
 
+/**
+ * Create a synchronous layer implementation from entry/exit callbacks and optional conditions.
+ *
+ * The created layer:
+ * - runs `entry` before the wrapped handler, with the current input and shared context
+ * - runs `exit` after the wrapped handler, with the handler result (value or Error) and context
+ * - uses `conditions` to decide skip/retry/override behavior on entry/exit
+ * - shares `context` between entry/exit/conditions, managed per-layer instance
+ *
+ * This factory is intended to be used together with `stackLayer`.
+ * For async entry/exit/conditions, use `makeAsyncLayer` + `stackAsyncLayer` instead.
+ *
+ * @typeParam I - Input type for the layer.
+ * @typeParam O - Output type for the layer.
+ * @typeParam C - Context type shared inside the layer.
+ * @param entry - Entry hook called before the handler with the current input and optional context.
+ * @param exit - Exit hook called after the handler with the handler result and optional context.
+ * @param context - Optional shared context object for this layer instance.
+ * @param name - Optional layer name used in debug/error messages. Defaults to "layer".
+ * @param conditions - Optional conditional hooks to control entry/exit behavior (skip/retry/override).
+ * @returns A LayerExecutableInterface that can be passed to `stackLayer`.
+ */
 export function makeLayer<I, O, C>(
   entry: LayerEntry<I, C>,
   exit: LayerExit<O, C>,
@@ -243,6 +299,28 @@ export function makeLayer<I, O, C>(
   }
 }
 
+/**
+ * Create an asynchronous layer implementation from entry/exit callbacks and optional conditions.
+ *
+ * The created layer:
+ * - runs `entry` before the handler, with the current input and shared context
+ * - runs `exit` after the handler, with the handler result (value or Error) and context
+ * - uses `conditions` to decide skip/retry/override behavior on entry/exit
+ * - shares `context` between entry/exit/conditions, managed per-layer instance
+ *
+ * Unlike `makeLayer`, this variant is designed for async entry/exit/conditions:
+ * it can safely return Promises, and is intended to be used with `stackAsyncLayer`.
+ *
+ * @typeParam I - Input type for the layer.
+ * @typeParam O - Output type for the layer.
+ * @typeParam C - Context type shared inside the layer.
+ * @param entry - Async-capable entry hook called before the handler with the current input and optional context.
+ * @param exit - Async-capable exit hook called after the handler with the handler result and optional context.
+ * @param context - Optional shared context object for this layer instance.
+ * @param name - Optional layer name used in debug/error messages. Defaults to "layer".
+ * @param conditions - Optional async-capable conditional hooks to control entry/exit behavior (skip/retry/override).
+ * @returns A LayerExecutableInterface that can be passed to `stackAsyncLayer`.
+ */
 export function makeAsyncLayer<I, O, C>(
   entry: LayerEntry<I, C>,
   exit: LayerExit<O, C>,
