@@ -1,6 +1,6 @@
 {
   "name": "r-pipeline",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "type": "module",
   "description": "A TypeScript utility library for data processing pipelines with async support",
   "main": "dist/index.js",
