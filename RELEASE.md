@@ -4,9 +4,29 @@
 
 ### 必要な設定
 
-1. **NPM_TOKEN の設定**
+1. **NPM Trusted Publishing の設定**（推奨）
+   
+   NPMのTrusted Publishingを使用することで、より安全にパッケージを公開できます。
+   
+   **設定手順：**
+   
+   a. NPM側の設定
+   - [npmjs.com](https://www.npmjs.com) にログイン
+   - アカウント設定 > Access Tokens > Automation タブ
+   - 「Add GitHub Actions」をクリック
+   - GitHubリポジトリを選択（例：`risk/r-pipeline`）
+   - 「Generate token」をクリック
+   - これで、GitHub Actionsから自動的に認証されるようになります
+   
+   b. GitHub側の設定
+   - ワークフローは既にTrusted Publishingに対応済みです
+   - `id-token: write` パーミッションが設定されています
+   - 追加のシークレット設定は不要です
+   
+   **従来の方法（NPM_TOKENを使用する場合）：**
    - GitHub リポジトリの Settings > Secrets and variables > Actions
    - `NPM_TOKEN` を追加（npmjs.com のアクセストークン）
+   - この場合は、ワークフローの `NODE_AUTH_TOKEN` を `${{ secrets.NPM_TOKEN }}` に変更してください
 
 2. **ブランチ保護ルールの設定**
    - GitHub リポジトリの Settings > Branches
@@ -46,3 +66,5 @@
 - タグがプッシュされると自動的にリリースが開始されます
 - GitHub Release には変更内容が自動で記載されます
 - **プルリクエストはテストが通らないとマージできません**
+- Trusted Publishingを使用する場合、`--provenance` フラグにより、パッケージの出所が証明されます
+- パッケージは `--access public` で公開されます（スコープ付きパッケージの場合）
