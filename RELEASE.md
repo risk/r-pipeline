@@ -68,3 +68,29 @@
 - **プルリクエストはテストが通らないとマージできません**
 - Trusted Publishingを使用する場合、`--provenance` フラグにより、パッケージの出所が証明されます
 - パッケージは `--access public` で公開されます（スコープ付きパッケージの場合）
+
+### トラブルシューティング
+
+#### 404 Not Found エラーが発生する場合
+
+`npm error 404 Not Found - PUT https://registry.npmjs.org/r-pipeline` というエラーが発生する場合、以下の点を確認してください：
+
+1. **NPM側でTrusted Publishingが正しく設定されているか確認**
+   - [npmjs.com](https://www.npmjs.com) にログイン
+   - アカウント設定 > Access Tokens > Automation タブ
+   - GitHubリポジトリ（`risk/r-pipeline`）が正しく設定されているか確認
+   - 設定されていない場合は、再度「Add GitHub Actions」から設定してください
+
+2. **パッケージの所有者を確認**
+   - パッケージが既に存在する場合、そのパッケージの所有者が、Trusted Publishingで設定したGitHubリポジトリの所有者と一致する必要があります
+   - [npmjs.com/package/r-pipeline](https://www.npmjs.com/package/r-pipeline) でパッケージの所有者を確認
+   - 所有者が異なる場合、パッケージの所有者を変更するか、新しいパッケージ名を使用してください
+
+3. **初回公開の場合**
+   - 初回公開の場合は、パッケージが存在しないため、正常に公開されるはずです
+   - 404エラーが発生する場合は、上記の設定を確認してください
+
+4. **認証の確認**
+   - Trusted Publishingが正しく設定されている場合、`setup-node`アクションが自動的にOIDCトークンを使用して認証します
+   - ワークフローのログで、provenance statementが正常に公開されているか確認してください
+   - もしprovenance statementが公開されていない場合は、Trusted Publishingの設定に問題がある可能性があります
