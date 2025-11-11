@@ -31,6 +31,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Debug - Check authentication
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Actor: ${{ github.actor }}"
+          npm whoami --registry=https://registry.npmjs.org || echo "Not authenticated"
+
       - name: Publish to npm
         run: npm publish --provenance --access public
 

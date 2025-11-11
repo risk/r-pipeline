@@ -14,9 +14,12 @@
    - [npmjs.com](https://www.npmjs.com) にログイン
    - アカウント設定 > Access Tokens > Automation タブ
    - 「Add GitHub Actions」をクリック
-   - GitHubリポジトリを選択（例：`risk/r-pipeline`）
+   - GitHubリポジトリを選択（**正確に** `risk/r-pipeline` と入力）
+   - **ワークフロー名を指定**（**重要**: `Release` と正確に入力。大文字小文字を区別します）
    - 「Generate token」をクリック
    - これで、GitHub Actionsから自動的に認証されるようになります
+   
+   **重要**: ワークフロー名は `.github/workflows/release.yml` ファイルの `name: Release` と完全に一致している必要があります。
    
    b. GitHub側の設定
    - ワークフローは既にTrusted Publishingに対応済みです
@@ -79,7 +82,9 @@
    - [npmjs.com](https://www.npmjs.com) にログイン
    - アカウント設定 > Access Tokens > Automation タブ
    - GitHubリポジトリ（`risk/r-pipeline`）が正しく設定されているか確認
-   - 設定されていない場合は、再度「Add GitHub Actions」から設定してください
+   - **ワークフロー名が `Release` と正確に一致しているか確認**（大文字小文字を区別します）
+   - 設定されていない、または不一致の場合は、再度「Add GitHub Actions」から設定してください
+   - 既存の設定がある場合は、削除してから再設定してください
 
 2. **パッケージの所有者を確認**
    - パッケージが既に存在する場合、そのパッケージの所有者が、Trusted Publishingで設定したGitHubリポジトリの所有者と一致する必要があります
